@@ -1,0 +1,8 @@
+.DS_Store
+config.yaml
+style.yaml
+*.log
+*.tmp
+node_modules/
+__pycache__/
+output/
