@@ -1,0 +1,1086 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tang 公众号排版工作台</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18231f;
+      --muted: #68736e;
+      --paper: #fffef9;
+      --canvas: #edf2ef;
+      --green: #0b7a65;
+      --purple: #8b5cf6;
+      --line: #d7e3de;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--canvas);
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    button { font: inherit; }
+    .shell {
+      display: grid;
+      grid-template-columns: minmax(330px, 390px) minmax(390px, 470px);
+      justify-content: center;
+      gap: 34px;
+      min-height: 100vh;
+      padding: 42px 24px 80px;
+    }
+    .panel {
+      position: sticky;
+      top: 32px;
+      align-self: start;
+      max-height: calc(100vh - 64px);
+      overflow-y: auto;
+      padding: 28px;
+      border: 1px solid var(--line);
+      background: rgba(255, 254, 249, .92);
+      box-shadow: 0 20px 60px rgba(24, 35, 31, .08);
+    }
+    .eyebrow {
+      margin: 0 0 12px;
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .18em;
+    }
+    h1 { margin: 0; font-size: 26px; line-height: 1.35; }
+    .intro { margin: 14px 0 24px; color: var(--muted); font-size: 14px; line-height: 1.75; }
+    .status {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin: 0 0 22px;
+      padding: 12px 0;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+    .composer { margin: 0 0 24px; }
+    .field-label { display:block; margin:0 0 7px; color:var(--muted); font-size:12px; font-weight:700; }
+    .field, .editor {
+      width: 100%;
+      margin: 0 0 10px;
+      border: 1px solid var(--line);
+      border-radius: 0;
+      color: var(--ink);
+      background: #fff;
+      font: inherit;
+    }
+    .field { height: 40px; padding: 0 11px; }
+    .editor { min-height: 210px; padding: 12px; resize: vertical; font-size: 13px; line-height: 1.7; }
+    .field:focus, .editor:focus { outline: 2px solid rgba(11,122,101,.22); border-color:var(--green); }
+    .component-grid { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 10px; }
+    .component-button {
+      padding: 7px 9px;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      background: #fff;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .component-button:hover { border-color:var(--green); color:var(--green); }
+    .composer-note { margin:0 0 10px; color:var(--muted); font-size:11px; line-height:1.6; }
+    .image-slot:focus { outline: 3px solid rgba(11,122,101,.2); border-color:var(--green) !important; }
+    .image-slot button { margin-top:10px; padding:7px 10px; border:1px solid currentColor; color:inherit; background:#fff; cursor:pointer; }
+    .article-wrap img[data-image-slot] { cursor:pointer; }
+    .image-actions { display:flex; align-items:center; gap:9px; margin:9px 0 0; color:#6c7a74; font-size:11px; }
+    .image-actions button { padding:6px 9px; border:1px solid #9fb8ae; color:#0b7a65; background:#fff; cursor:pointer; }
+    .image-actions button:disabled { cursor:wait; opacity:.55; }
+    .theme-title { margin: 0 0 10px; color: var(--muted); font-size: 12px; font-weight: 700; }
+    .themes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 0 0 20px; }
+    .theme-card {
+      min-width: 0;
+      padding: 7px;
+      border: 1px solid var(--line);
+      border-radius: 0;
+      color: var(--ink);
+      background: #fff;
+      cursor: pointer;
+      text-align: left;
+    }
+    .theme-card[aria-pressed="true"] { border-color: var(--green); box-shadow: inset 0 0 0 1px var(--green); }
+    .theme-card:focus-visible { outline: 3px solid rgba(139, 92, 246, .3); outline-offset: 2px; }
+    .theme-preview { display: block; height: 58px; margin-bottom: 7px; padding: 8px; overflow: hidden; }
+    .theme-preview::before, .theme-preview::after { content: ""; display: block; }
+    .theme-preview::before { width: 62%; height: 6px; margin-bottom: 8px; }
+    .theme-preview::after { width: 88%; height: 22px; }
+    .theme-preview.editorial { background:#fffef9; border-top:2px solid #0b7a65; }
+    .theme-preview.editorial::before { background:#0b7a65; }
+    .theme-preview.editorial::after { border-left:3px solid #0b7a65; background:#f2f7f4; }
+    .theme-preview.paper { background:#fff7e8; border:1px solid #ddc49d; }
+    .theme-preview.paper::before { margin-left:auto; margin-right:auto; background:#b85c3c; }
+    .theme-preview.paper::after { border-top:1px solid #b85c3c; border-bottom:1px solid #b85c3c; background:#fbefd8; }
+    .theme-preview.tech { background:#f4f8ff; border-top:5px solid #2456d6; }
+    .theme-preview.tech::before { background:#2456d6; }
+    .theme-preview.tech::after { background:#e7efff; border-left:4px solid #2456d6; }
+    .theme-preview.spring { background:#f6faed; border-top:2px solid #679645; }
+    .theme-preview.spring::before { margin-left:auto; margin-right:auto; background:#679645; border-radius:8px; }
+    .theme-preview.spring::after { background:#edf6df; border:1px solid #9cbd78; }
+    .theme-preview.red { background:#fff4f2; border-top:5px solid #b51f2a; }
+    .theme-preview.red::before { background:#b51f2a; }
+    .theme-preview.red::after { background:#b51f2a; border:3px double #e2b850; }
+    .theme-preview.mono { background:#fff; border:2px solid #181818; }
+    .theme-preview.mono::before { width:72%; background:#181818; }
+    .theme-preview.mono::after { background:#f2f2f2; border-left:6px solid #181818; }
+    .theme-preview.autumn { position:relative; background:#fff3d8; border:1px solid #d99d48; }
+    .theme-preview.autumn::before { margin-left:auto; margin-right:auto; background:#a85a2a; }
+    .theme-preview.autumn::after { margin-left:auto; margin-right:auto; border:1px solid #d99d48; background:#fffaf0; animation:preview-float 2.8s ease-in-out infinite; }
+    .theme-preview.violet { background:#f8f3ff; border-top:3px solid #7652a8; }
+    .theme-preview.violet::before { margin-left:auto; background:#7652a8; }
+    .theme-preview.violet::after { border-left:3px solid #7652a8; background:#eee5fa; }
+    .theme-preview.ocean { background:#effbfc; border-top:3px solid #238ca0; }
+    .theme-preview.ocean::before { background:#238ca0; border-radius:9px; }
+    .theme-preview.ocean::after { border:1px solid #86cbd3; background:#e2f5f7; }
+    .theme-preview.coffee { background:#f7f0e8; border:1px solid #ad8669; }
+    .theme-preview.coffee::before { background:#79533d; }
+    .theme-preview.coffee::after { border-top:2px solid #79533d; background:#efe1d1; }
+    .theme-preview.peach { background:#fff3f3; border-top:3px solid #cf6f80; }
+    .theme-preview.peach::before { margin-left:auto; margin-right:auto; background:#cf6f80; border-radius:9px; }
+    .theme-preview.peach::after { border-left:3px solid #cf6f80; border-right:3px solid #cf6f80; background:#fae4e7; }
+    @keyframes preview-float { 50% { transform:translateY(3px); } }
+    .theme-name { display:block; overflow:hidden; font-size:11px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
+    .actions { display: grid; gap: 10px; }
+    .action {
+      width: 100%;
+      min-height: 46px;
+      border: 1px solid var(--green);
+      border-radius: 0;
+      color: white;
+      background: var(--green);
+      cursor: pointer;
+      font-weight: 750;
+    }
+    .action.secondary { color: var(--green); background: transparent; }
+    .action:focus-visible { outline: 3px solid rgba(139, 92, 246, .35); outline-offset: 2px; }
+    .meta { margin: 24px 0 0; padding: 0; list-style: none; color: var(--muted); font-size: 12px; line-height: 1.8; }
+    .phone {
+      overflow: hidden;
+      border: 1px solid #d9ddd9;
+      border-radius: 26px;
+      background: #fff;
+      box-shadow: 0 30px 90px rgba(24, 35, 31, .16);
+    }
+    .phone-top { height: 32px; background: #f7f7f5; border-bottom: 1px solid #eceeec; }
+    .native-header { padding: 34px 26px 26px; background: #fff; }
+    .native-header h2 {
+      margin: 0 0 12px;
+      color: #141414;
+      font-family: "Songti SC", STSong, serif;
+      font-size: 27px;
+      line-height: 1.35;
+      letter-spacing: -.02em;
+    }
+    .native-header p { margin: 0; color: #8c8c8c; font-size: 13px; }
+    .article-wrap { padding: 0 24px 48px; background: #fff; }
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 28px;
+      z-index: 10;
+      transform: translate(-50%, 20px);
+      padding: 11px 18px;
+      color: white;
+      background: #18231f;
+      opacity: 0;
+      pointer-events: none;
+      transition: .2s ease;
+      font-size: 13px;
+    }
+    .toast.show { transform: translate(-50%, 0); opacity: 1; }
+    @media (max-width: 780px) {
+      .shell { display: block; padding: 0; }
+      .panel { position: static; padding: 20px; border-width: 0 0 1px; box-shadow: none; }
+      .panel .intro, .meta { display: none; }
+      .actions { grid-template-columns: 1fr; }
+      .phone { border: 0; border-radius: 0; box-shadow: none; }
+      .phone-top { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <aside class="panel">
+      <p class="eyebrow">TANG EDITORIAL · V2</p>
+      <h1>公众号排版工作台</h1>
+      <p class="intro">正文保持为真实文字。复制后粘贴到壹伴的“编辑源代码”或富文本编辑区，再做微信手机预览。</p>
+      <p class="status"><span class="dot" aria-hidden="true"></span><span id="statusText">正在检查兼容性…</span></p>
+      <section class="composer" aria-label="文章输入区">
+        <p class="theme-title">1. 粘贴文章</p>
+        <label class="field-label" for="titleInput">文章标题</label>
+        <input class="field" id="titleInput" value="我想用 AI，把创作这件事坚持下来">
+        <label class="field-label" for="bylineInput">作者与日期</label>
+        <input class="field" id="bylineInput" value="唐泽龙　2026年9月">
+        <label class="field-label" for="markdownInput">正文（支持 Markdown 或普通分段文字）</label>
+        <textarea class="editor" id="markdownInput" placeholder="把新文章直接粘贴到这里。空行会分段；## 是小标题；> 是引用；**文字** 会加粗。"></textarea>
+        <p class="theme-title">2. 插入小组件</p>
+        <div class="component-grid" aria-label="文章组件">
+          <button class="component-button" type="button" data-component="heading">小标题</button>
+          <button class="component-button" type="button" data-component="quote">引用</button>
+          <button class="component-button" type="button" data-component="highlight">金句卡</button>
+          <button class="component-button" type="button" data-component="flow">流程卡</button>
+          <button class="component-button" type="button" data-component="image">图片位</button>
+          <button class="component-button" type="button" data-component="divider">分隔符</button>
+          <button class="component-button" type="button" data-component="footer">结尾签名</button>
+        </div>
+        <p class="composer-note">点击组件会插入可修改的文字。按 ⌘ Enter 也可以更新预览；图片刷新页面后需要重新粘贴。</p>
+        <p class="composer-note" id="wechatStatus">微信图片接口：正在检查…</p>
+        <button class="action" id="renderButton" type="button">生成 / 更新预览</button>
+      </section>
+      <p class="theme-title">3. 选择排版主题</p>
+      <div class="themes" aria-label="选择文章主题">
+        <button class="theme-card" type="button" data-theme="editorial" aria-pressed="true"><span class="theme-preview editorial"></span><span class="theme-name">墨绿编辑部</span></button>
+        <button class="theme-card" type="button" data-theme="paper" aria-pressed="false"><span class="theme-preview paper"></span><span class="theme-name">暖纸手记</span></button>
+        <button class="theme-card" type="button" data-theme="tech" aria-pressed="false"><span class="theme-preview tech"></span><span class="theme-name">蓝色科技</span></button>
+        <button class="theme-card" type="button" data-theme="spring" aria-pressed="false"><span class="theme-preview spring"></span><span class="theme-name">春日绿意</span></button>
+        <button class="theme-card" type="button" data-theme="red" aria-pressed="false"><span class="theme-preview red"></span><span class="theme-name">红色宣言</span></button>
+        <button class="theme-card" type="button" data-theme="mono" aria-pressed="false"><span class="theme-preview mono"></span><span class="theme-name">黑白极简</span></button>
+        <button class="theme-card" type="button" data-theme="autumn" aria-pressed="false"><span class="theme-preview autumn"></span><span class="theme-name">秋日流光 · SVG</span></button>
+        <button class="theme-card" type="button" data-theme="violet" aria-pressed="false"><span class="theme-preview violet"></span><span class="theme-name">紫雾灵感</span></button>
+        <button class="theme-card" type="button" data-theme="ocean" aria-pressed="false"><span class="theme-preview ocean"></span><span class="theme-name">海盐蓝调</span></button>
+        <button class="theme-card" type="button" data-theme="coffee" aria-pressed="false"><span class="theme-preview coffee"></span><span class="theme-name">咖啡书页</span></button>
+        <button class="theme-card" type="button" data-theme="peach" aria-pressed="false"><span class="theme-preview peach"></span><span class="theme-name">桃气手帐</span></button>
+      </div>
+      <div class="actions">
+        <button class="action" id="copySourceButton" type="button">复制 HTML 源码（推荐）</button>
+        <button class="action secondary" id="copyButton" type="button">复制公众号富文本</button>
+        <button class="action secondary" id="downloadButton" type="button">下载 HTML</button>
+      </div>
+      <ul class="meta">
+        <li>正文：16px / 1.9 行距</li>
+        <li>主色：墨绿；紫色仅作标记</li>
+        <li>推荐：关闭壹伴 MD，再粘贴源码</li>
+        <li>源码中的图片保留为插入位置</li>
+        <li>发布：本页不会自动保存或发表</li>
+      </ul>
+    </aside>
+
+    <section class="phone" aria-label="公众号手机预览">
+      <div class="phone-top"></div>
+      <header class="native-header">
+        <h2 id="previewTitle">我想用 AI，把创作这件事坚持下来</h2>
+        <p id="previewByline">唐泽龙　2026年9月</p>
+      </header>
+      <div class="article-wrap">
+        <section id="wechatArticle" style="color:#24312d;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;font-size:16px;line-height:1.9;letter-spacing:0.04em;word-break:break-word;">
+          <section data-role="feature" style="margin:0 0 34px;overflow:hidden;background-color:#ffffff;"></section>
+          <section data-role="quote" style="margin:0 0 38px;padding:18px 18px 18px 22px;border-left:3px solid #0b7a65;background-color:#f2f7f4;">
+            <p style="margin:0;color:#24312d;font-family:'Songti SC',STSong,serif;font-size:18px;line-height:1.8;"><strong style="color:#0b7a65;font-weight:700;">我不是想让 AI 替我写。</strong>我想验证的是：它能不能帮助我，把已经存在的想法持续表达出来。</p>
+          </section>
+
+          <p style="margin:0 0 22px;">前段时间，我刷到一个摄影师的视频。</p>
+          <p style="margin:0 0 22px;">他平时背着相机到处跑，拍各种各样的路人。有一天，他忽然问自己：记录的意义到底是什么？难道只是因为害怕忘记吗？</p>
+          <p style="margin:0 0 22px;">最开始，他和大多数人一样，只是觉得拍摄好玩。看到身边发生的事情，就顺手记录下来。后来他在大学学习摄影，有了自己的第一台相机，也慢慢把摄影变成了工作。</p>
+          <p style="margin:0 0 22px;">但兴趣一旦变成工作，很多事情也会跟着变化。构图、光线、交付和变现都需要考虑。每天都在拍，最初那种单纯想表达的感觉，反而可能变淡。</p>
+          <p style="margin:0 0 22px;">后来，他把镜头对准了外婆。</p>
+          <p style="margin:0 0 22px;">他从小由外婆照顾。在他的记忆里，外婆一直勤劳、俭朴，很少认真打扮自己。他想用相机留下外婆不同于日常生活的一面。</p>
+          <p style="margin:0 0 22px;">他还讲过一句让我印象很深的话，大意是：会摄影的人，往往很少出现在镜头里。</p>
+          <p style="margin:0 0 22px;">拍过很多人以后，他开始把镜头转向自己。他记录熬夜修图时的崩溃，记录亲人第一次面对镜头时紧张又新奇的表情，也记录生活里一些没有提前准备的时刻。</p>
+          <p style="margin:0 0 22px;">翻开相册以后，留下最多的通常不是那些精心制作的照片，而是这些当时看起来很普通的瞬间。</p>
+          <section data-role="image" style="margin:32px 0 38px;">
+            <img src="body-album.jpg" alt="翻看普通生活相册" style="display:block;width:100%;height:auto;border:0;">
+            <p style="margin:10px 0 0;color:#7a8580;font-size:12px;line-height:1.6;text-align:center;letter-spacing:0.08em;">那些普通的瞬间，最后留得最久。</p>
+          </section>
+
+          <section data-role="heading" style="margin:48px 0 24px;padding-top:14px;border-top:1px solid #bad4cb;">
+            <p style="margin:0;color:#0b7a65;font-size:20px;line-height:1.5;font-weight:700;letter-spacing:0.04em;">01｜文字也是一种镜头 <span style="color:#8b5cf6;font-size:14px;">●</span></p>
+          </section>
+          <p style="margin:0 0 22px;">这件事让我想到，摄影和写作其实都在记录。</p>
+          <p style="margin:0 0 22px;">照片留下当时的画面，文字留下当时的想法。很多念头出现的时候，我们觉得自己一定不会忘记。过了一段时间再回头看，才发现记忆只剩下一个模糊的轮廓，当时具体在意什么、为什么高兴或难过，已经很难重新说清楚。</p>
+          <p style="margin:0 0 22px;">记录的意义，不只是证明某件事发生过。一次次回看这些内容，也在提醒我们怎样观察生活、怎样感受别人，以及什么东西对自己真正重要。</p>
+          <p style="margin:0 0 22px;">摄影师在不断拍摄的过程中积累审美。一个人在持续写作的时候，也会逐渐看见自己的关注、判断和表达方式。</p>
+
+          <section data-role="heading" style="margin:48px 0 24px;padding-top:14px;border-top:1px solid #bad4cb;">
+            <p style="margin:0;color:#0b7a65;font-size:20px;line-height:1.5;font-weight:700;letter-spacing:0.04em;">02｜我为什么想用 AI 帮助记录 <span style="color:#8b5cf6;font-size:14px;">●</span></p>
+          </section>
+          <p style="margin:0 0 22px;">我对自己的认知一直很明确：我是一名很好的创作者。这是我对自己的自信。</p>
+          <p style="margin:0 0 22px;">长期困扰我的不是没有想法，而是缺少一个适合自己的表达平台，也没有找到一种能够坚持下来的创作方式。</p>
+          <p style="margin:0 0 22px;">我平时会把工作和生活里的事情告诉 Codex，也会把重要结果保存到 Obsidian。时间久了以后，里面已经积累了大量项目记录、聊天、判断和临时想法。</p>
+          <p style="margin:0 0 22px;">这些记录很真实，但不一定已经成为可以阅读的文章。有些只是一句话，有些散落在不同日期，还有些想法当时没有继续展开。</p>
+          <p style="margin:0 0 22px;">我想做的，是让 AI 先帮我把这些内容找回来。</p>
+          <p style="margin:0 0 22px;">它可以回看最近一周或一个月发生的事情，挑出值得继续谈的部分，然后每次只问我一个问题。我不需要坐在电脑前认真准备，可以直接说。语音转成文字以后，AI 再帮助我整理顺序，指出哪里缺少过程、哪里只有结论，以及哪些内容别人可能看不懂。</p>
+          <section data-role="quote" style="margin:32px 0;padding:16px 0 16px 20px;border-left:3px solid #0b7a65;background-color:#f7f9f7;">
+            <p style="margin:0;color:#24312d;font-family:'Songti SC',STSong,serif;font-size:18px;line-height:1.8;"><strong style="color:#0b7a65;">观点仍然来自我，经历也来自我。</strong> AI 做的是提问、整理和编辑。</p>
+          </section>
+          <p style="margin:0 0 22px;">我不是想通过 AI 获得创作能力。我想验证的是，它能不能帮助我把已经存在的想法持续表达出来，并建立一条能够重复的创作链路。</p>
+          <p style="margin:0 0 22px;">这和摄影师拍摄 Log 有一点相似。拍摄的时候先保留更多原始画面信息，后期再决定怎样调色。记录想法的时候，也可以先把未经整理的感受留下来，再慢慢决定哪些内容值得展开、怎样表达更准确。</p>
+
+          <section data-role="heading" style="margin:48px 0 24px;padding-top:14px;border-top:1px solid #bad4cb;">
+            <p style="margin:0;color:#0b7a65;font-size:20px;line-height:1.5;font-weight:700;letter-spacing:0.04em;">03｜不必每次都精心摆拍 <span style="color:#8b5cf6;font-size:14px;">●</span></p>
+          </section>
+          <p style="margin:0 0 22px;">如果每一次记录都要求构图完美、灯光完整、文案成熟，很难长期坚持。</p>
+          <p style="margin:0 0 22px;">写作也是一样。如果每次都要求自己先想出一个大选题，再坐下来完成一篇结构严密的文章，很多想法可能在动笔以前就消失了。</p>
+          <p style="margin:0 0 22px;">更自然的方式，是先留下当时真正想说的话。</p>
+          <p style="margin:0 0 22px;">它可能来自一段语音、一张截图、一件刚刚做完的工作，或者某个突然触动自己的短视频。AI 可以帮助我们把这些材料放到一起，找到里面共同指向的问题，再把它们分别整理成公众号文章、推文或短视频口播稿。</p>
+          <p style="margin:0 0 22px;">不同平台需要不同的表达方式，但原始的感受不应该被改变。标题可以更清楚，结构可以更好读，图片也可以帮助读者理解，但不能为了传播效果重新制造一段并不存在的经历。</p>
+
+          <section data-role="heading" style="margin:48px 0 24px;padding-top:14px;border-top:1px solid #bad4cb;">
+            <p style="margin:0;color:#0b7a65;font-size:20px;line-height:1.5;font-weight:700;letter-spacing:0.04em;">04｜找到自己的创作节奏 <span style="color:#8b5cf6;font-size:14px;">●</span></p>
+          </section>
+          <p style="margin:0 0 22px;">我想要的创作方式，不是每天逼自己生产一篇作品。</p>
+          <p style="margin:0 0 22px;">我更希望先养成自然记录的习惯：想到什么就说下来，做过什么就留下证据，遇到有意思的人和事情也及时保存。等到想写的时候，AI 再帮助我回到这些记录里，把当时没有说完的话继续说完。</p>
+          <p style="margin:0 0 22px;">这一次，我想把整条链路真正走一遍：先记录，接着用语音把想法说出来，再整理成文字，补上合适的图片和排版，最后放到一个别人能够阅读的平台上。发布以后，文章和反馈还会回到记录里，成为下一次创作的材料。</p>
+          <section data-role="flow" style="margin:32px 0;padding:17px 12px;border-top:1px solid #0b7a65;border-bottom:1px solid #0b7a65;text-align:center;">
+            <p style="margin:0;color:#0b7a65;font-size:15px;font-weight:700;letter-spacing:0.08em;">记录 <span style="color:#8b5cf6;">→</span> 对话 <span style="color:#8b5cf6;">→</span> 整理 <span style="color:#8b5cf6;">→</span> 发布 <span style="color:#8b5cf6;">→</span> 复盘</p>
+          </section>
+          <p style="margin:0 0 22px;">这些随手留下的内容，也许不会马上变成文章。但它们会一点点积累成自己的审美、感知和判断。</p>
+          <p style="margin:0 0 22px;">我们都知道记忆很容易模糊，所以需要把镜头转向自己，也对准那些真正想留下的东西。</p>
+          <p style="margin:0 0 22px;">记录不只是让某个瞬间有迹可循。它也在一次次提醒我们，那些具体的爱和真实的感受，没有被轻易忘记。</p>
+
+          <section data-role="heading" style="margin:48px 0 24px;padding-top:14px;border-top:1px solid #bad4cb;">
+            <p style="margin:0;color:#0b7a65;font-size:20px;line-height:1.5;font-weight:700;letter-spacing:0.04em;">05｜关于创作，我现在的想法 <span style="color:#8b5cf6;font-size:14px;">●</span></p>
+          </section>
+          <p style="margin:0 0 22px;">写到这里的时候，我不知道别人能不能理解，也不知道文章发出去以后会有多少点赞。</p>
+          <p style="margin:0 0 22px;">但我就是想说，想把这个话题抛出去。对我来说，这是一种很对的创作感觉。</p>
+          <p style="margin:0 0 22px;">如果每次动笔以前都先想文章能够拿多少赞，创作很容易变成另一种工作。这种依靠结果预期产生的动力，也许一两周就会消失。</p>
+          <p style="margin:0 0 22px;">我更希望创作是一件令自己兴奋的事，或者自然到随手就能开始。看到一个视频有所触动，可以先说下来；工作中产生一个判断，可以马上记一句；想法暂时不完整，也不用等它成熟以后才允许自己记录。</p>
+          <p style="margin:0 0 22px;">AI 在这里能够提供很具体的帮助。一个念头最开始可能只有一句话，AI 可以继续追问，让我补充当时发生了什么、为什么在意、这个判断从哪里来。内容在对话中慢慢展开，我也在一次次回答和修改中练习表达。</p>
+          <p style="margin:0 0 22px;">这种进步不只发生在 AI 身上。创作者也会逐渐更清楚自己在关注什么，怎样把一件事说完整，以及哪些表达并不属于自己。</p>
+          <p style="margin:0 0 22px;">AI 也不会因为模型升级就自动更懂我。只有这些原话、选择、修改意见和发布反馈被持续保存，下一代模型读取以后，才有可能接着理解我的创作习惯，而不是每次重新认识我。</p>
+          <p style="margin:0 0 22px;">我们也会因为别人的文章、照片或视频产生新的感受。它们可以成为创作的起点，但不应该成为直接复制的成品。更合理的方式，是先保留原作者和原始链接，再问自己：究竟是哪一部分触动了我？它让我想起了什么经历？我同意什么，又想补充或反对什么？</p>
+          <p style="margin:0 0 22px;">文章发布以后，阅读、评论和读者提出的新问题会提供真实反馈。这些反馈能够说明某个话题是否被理解、某种表达是否有效，但点赞数量不能证明一个观点是对的。</p>
+          <p style="margin:0 0 22px;">把结果和复盘重新放回记录里，下一次创作就不再从空白开始。这也是一种学习方式：先表达，再观察真实反应，然后带着新的理解继续写。</p>
+          <section data-role="quote" style="margin:32px 0;padding:16px 0 16px 20px;border-left:3px solid #0b7a65;background-color:#f7f9f7;">
+            <p style="margin:0;color:#0b7a65;font-family:'Songti SC',STSong,serif;font-size:18px;line-height:1.8;font-weight:700;">先表达，再观察真实反应，然后带着新的理解继续写。</p>
+          </section>
+          <p style="margin:0 0 22px;">当然，AI 降低了记录和表达的门槛，不代表我们自然就能长期坚持。兴奋可能会消退，生活也会打断原本的计划。怎样让创作真正成为生活的一部分，我现在还没有答案。</p>
+          <p style="margin:0 0 22px;">这篇文章就是这条创作链路的第一次测试。它能不能让我继续记录、发布和复盘，需要交给接下来的时间回答。</p>
+
+          <section data-role="footer" style="margin:54px 0 0;padding-top:16px;border-top:1px solid #d7e3de;text-align:right;">
+            <p style="margin:0;color:#0b7a65;font-size:11px;font-weight:700;letter-spacing:0.18em;">TANG ZELONG · FIELD NOTES 001</p>
+          </section>
+        </section>
+      </div>
+    </section>
+  </main>
+  <input id="imageFileInput" type="file" accept="image/png,image/jpeg" hidden>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script>
+    const article = document.querySelector('#wechatArticle');
+    const statusText = document.querySelector('#statusText');
+    const toast = document.querySelector('#toast');
+    const titleInput = document.querySelector('#titleInput');
+    const bylineInput = document.querySelector('#bylineInput');
+    const markdownInput = document.querySelector('#markdownInput');
+    const imageFileInput = document.querySelector('#imageFileInput');
+    const wechatStatus = document.querySelector('#wechatStatus');
+    const draftKey = 'tang-wechat-layout-draft-v1';
+    const imageAssets = new Map();
+    let activeTheme = 'editorial';
+    let selectedImageSlot = 0;
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 1800);
+    }
+
+    const featureSpecs = {
+      editorial: { bg1:'#f7fbf9', bg2:'#dcebe5', ink:'#24312d', accent:'#0b7a65', label:'TANG EDITORIAL · 001', title:'让想法留下来', sub:'真实 · 清晰 · 持续', motif:'editorial' },
+      paper: { bg1:'#fffaf0', bg2:'#f0d8b0', ink:'#4a3a31', accent:'#b85c3c', label:'PERSONAL NOTES · 001', title:'写下真实的自己', sub:'日常 · 感受 · 记忆', motif:'paper' },
+      tech: { bg1:'#f4f8ff', bg2:'#cfe0ff', ink:'#26344f', accent:'#2456d6', label:'SYSTEM LOG · 001', title:'把 AI 变成创作搭档', sub:'输入 · 提炼 · 输出', motif:'tech' },
+      spring: { bg1:'#fbfdf7', bg2:'#dcefc8', ink:'#35442f', accent:'#679645', label:'GROWTH NOTES · 001', title:'让表达慢慢生长', sub:'观察 · 积累 · 开花', motif:'spring' },
+      red: { bg1:'#fff8f5', bg2:'#f1c5b8', ink:'#5b171d', accent:'#b51f2a', label:'MANIFESTO · 001', title:'创作不是等待灵感', sub:'行动 · 发布 · 复盘', motif:'red' },
+      mono: { bg1:'#ffffff', bg2:'#dedede', ink:'#181818', accent:'#181818', label:'THESIS · 001', title:'观点比装饰更重要', sub:'问题 · 判断 · 结论', motif:'mono' },
+      autumn: { bg1:'#fff8e8', bg2:'#f4d7a2', ink:'#43372d', accent:'#b56b31', label:'FIELD NOTES · 001', title:'把创作这件事坚持下来', sub:'记录 · 对话 · 表达', motif:'autumn' },
+      violet: { bg1:'#fcf9ff', bg2:'#e2d7f4', ink:'#3b3048', accent:'#7652a8', label:'IDEA CLOUD · 001', title:'把灵感慢慢说清楚', sub:'灵感 · 联想 · 表达', motif:'violet' },
+      ocean: { bg1:'#f4fcfd', bg2:'#ccebf0', ink:'#244047', accent:'#238ca0', label:'OCEAN NOTES · 001', title:'让思绪像海风展开', sub:'呼吸 · 留白 · 流动', motif:'ocean' },
+      coffee: { bg1:'#fcf8f3', bg2:'#dbc4ae', ink:'#47392f', accent:'#79533d', label:'SLOW READING · 001', title:'在一页纸上认真思考', sub:'阅读 · 思考 · 沉淀', motif:'coffee' },
+      peach: { bg1:'#fff9f8', bg2:'#f5d4d9', ink:'#4d343a', accent:'#cf6f80', label:'DAILY MOMENT · 001', title:'收藏今天的小小心动', sub:'日常 · 温柔 · 分享', motif:'peach' }
+    };
+
+    const featureMotifs = {
+      editorial: `<g opacity="0.18" stroke="#0b7a65" stroke-width="1"><path d="M40 30H600M40 60H600M40 150H600M40 180H600"/><path d="M80 15V205M160 15V205M480 15V205M560 15V205"/></g><rect x="54" y="44" width="110" height="5" fill="#0b7a65"><animate attributeName="width" values="45;110;45" dur="4s" repeatCount="indefinite"/></rect><circle cx="555" cy="55" r="6" fill="#8b5cf6"><animate attributeName="opacity" values="0.25;1;0.25" dur="2.6s" repeatCount="indefinite"/></circle>`,
+      paper: `<path d="M0 36 C120 70 235 8 365 37 C478 63 555 20 640 5 V70 C532 91 443 99 335 78 C212 55 111 104 0 74Z" fill="#d6ad73" opacity="0.32"/><g><circle cx="87" cy="164" r="26" fill="none" stroke="#b85c3c" stroke-width="2" opacity="0.5"/><circle cx="87" cy="164" r="17" fill="#b85c3c" opacity="0.12"/><animateTransform attributeName="transform" type="translate" values="0 0;0 -6;0 0" dur="4.6s" repeatCount="indefinite"/></g><path d="M500 184Q550 142 607 170" fill="none" stroke="#9b7954" stroke-width="2"><animate attributeName="opacity" values="0.25;0.8;0.25" dur="3.2s" repeatCount="indefinite"/></path>`,
+      tech: `<g fill="none" stroke="#2456d6" opacity="0.35"><path d="M0 52 C130 8 240 97 370 44 S548 78 640 32" stroke-width="7"/><path d="M0 184 C145 128 257 218 388 160 S552 197 640 146" stroke-width="2"/></g><circle r="6" fill="#09a9c7"><animateMotion path="M40 52 C170 8 280 97 410 44 S588 78 630 32" dur="5s" repeatCount="indefinite"/></circle><g fill="#2456d6"><rect x="65" y="154" width="6" height="20"/><rect x="77" y="146" width="6" height="28"/><rect x="89" y="136" width="6" height="38"><animate attributeName="height" values="18;38;18" dur="2.8s" repeatCount="indefinite"/></rect></g>`,
+      spring: `<g fill="#679645"><g><ellipse cx="72" cy="59" rx="18" ry="8" transform="rotate(-32 72 59)"/><ellipse cx="105" cy="75" rx="16" ry="7" transform="rotate(25 105 75)" fill="#9fbd69"/><path d="M50 38Q87 70 127 92" fill="none" stroke="#527938" stroke-width="2"/><animateTransform attributeName="transform" type="rotate" values="-3 50 38;5 50 38;-3 50 38" dur="4.4s" repeatCount="indefinite"/></g><g><ellipse cx="560" cy="168" rx="18" ry="8" transform="rotate(28 560 168)"/><ellipse cx="590" cy="147" rx="15" ry="7" transform="rotate(-28 590 147)" fill="#d5aa36"/><path d="M530 190Q568 164 612 127" fill="none" stroke="#527938" stroke-width="2"/><animateTransform attributeName="transform" type="translate" values="0 0;0 -7;0 0" dur="5.2s" repeatCount="indefinite"/></g></g>`,
+      red: `<path d="M0 30L225 30L260 58L225 86H0Z" fill="#b51f2a" opacity="0.88"/><path d="M640 200H415L380 172L415 144H640Z" fill="#b51f2a" opacity="0.18"/><g fill="#d4a72c"><path d="M555 45l5 12 12 5-12 5-5 12-5-12-12-5 12-5z"><animate attributeName="opacity" values="0.25;1;0.25" dur="2.2s" repeatCount="indefinite"/></path><circle cx="90" cy="174" r="5"><animateTransform attributeName="transform" type="scale" values="0.7;1.2;0.7" dur="3s" repeatCount="indefinite"/></circle></g>`,
+      mono: `<g fill="#181818"><rect x="38" y="34" width="148" height="10"><animate attributeName="width" values="80;148;80" dur="4s" repeatCount="indefinite"/></rect><rect x="38" y="52" width="78" height="4" opacity="0.35"/><rect x="510" y="166" width="92" height="28" opacity="0.08"/></g><rect x="492" y="30" width="110" height="52" fill="none" stroke="#181818" stroke-width="2"><animate attributeName="y" values="30;38;30" dur="4.8s" repeatCount="indefinite"/></rect>`,
+      autumn: `<path d="M0 37 C130 72 220 4 353 31 C470 55 530 10 640 0 L640 52 C505 68 431 99 302 70 C187 44 97 95 0 69Z" fill="#e8bd69" opacity="0.38"/><g fill="#b56b31"><g><ellipse cx="70" cy="55" rx="13" ry="6" transform="rotate(-32 70 55)"/><ellipse cx="94" cy="70" rx="12" ry="6" transform="rotate(18 94 70)" fill="#8d8f3f"/><path d="M52 38Q84 69 112 88" fill="none" stroke="#73552f" stroke-width="2"/><animateTransform attributeName="transform" type="translate" values="0 0;0 7;0 0" dur="4.2s" repeatCount="indefinite"/></g><g><ellipse cx="565" cy="165" rx="14" ry="7" transform="rotate(24 565 165)"/><ellipse cx="590" cy="147" rx="11" ry="6" transform="rotate(-25 590 147)" fill="#8d8f3f"/><animateTransform attributeName="transform" type="translate" values="0 0;0 -8;0 0" dur="5s" repeatCount="indefinite"/></g></g>`,
+      violet: `<g fill="none" stroke="#7652a8" opacity="0.22"><circle cx="82" cy="63" r="36"><animate attributeName="r" values="28;40;28" dur="4.6s" repeatCount="indefinite"/></circle><circle cx="557" cy="169" r="25"/><path d="M42 181C132 116 205 213 292 161S475 105 608 150"/></g><path d="M506 47l8 17 17 8-17 8-8 17-8-17-17-8 17-8z" fill="#c098d8"><animateTransform attributeName="transform" type="rotate" values="0 506 72;180 506 72;360 506 72" dur="7s" repeatCount="indefinite"/></path>`,
+      ocean: `<g fill="none" stroke="#238ca0"><path d="M0 65C104 26 172 101 282 62S462 32 640 77" stroke-width="8" opacity="0.18"/><path d="M0 181C116 140 213 217 334 170S515 148 640 177" stroke-width="3" opacity="0.38"><animate attributeName="d" values="M0 181C116 140 213 217 334 170S515 148 640 177;M0 172C116 213 213 139 334 181S515 205 640 166;M0 181C116 140 213 217 334 170S515 148 640 177" dur="6s" repeatCount="indefinite"/></path></g><circle cx="548" cy="54" r="11" fill="#72c3cf" opacity="0.55"><animate attributeName="cy" values="54;65;54" dur="3.8s" repeatCount="indefinite"/></circle>`,
+      coffee: `<g stroke="#79533d" fill="none" opacity="0.32"><path d="M45 41H211M45 51H170" stroke-width="3"/><path d="M481 161h83a18 18 0 010 36h-83z"/><path d="M564 169h17a10 10 0 010 20h-17"/></g><path d="M510 151C499 135 523 128 511 110" fill="none" stroke="#a3785b" stroke-width="3"><animate attributeName="opacity" values="0.15;0.75;0.15" dur="3s" repeatCount="indefinite"/></path><circle cx="92" cy="171" r="17" fill="#b79276" opacity="0.25"><animateTransform attributeName="transform" type="translate" values="0 0;12 0;0 0" dur="5s" repeatCount="indefinite"/></circle>`,
+      peach: `<g fill="#cf6f80" opacity="0.25"><circle cx="82" cy="59" r="18"><animate attributeName="r" values="13;20;13" dur="3.6s" repeatCount="indefinite"/></circle><circle cx="110" cy="44" r="7"/><circle cx="553" cy="177" r="22"/><circle cx="580" cy="150" r="9"/></g><path d="M502 42c19-18 44 7 18 30-11 10-18 15-18 15s-8-6-18-15c-25-23 0-48 18-30z" fill="#cf6f80" opacity="0.45"><animateTransform attributeName="transform" type="translate" values="0 0;0 8;0 0" dur="4.4s" repeatCount="indefinite"/></path>`
+    };
+
+    function escapeHTML(value) {
+      return String(value).replace(/[&<>"']/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[character]);
+    }
+
+    function buildFeature(name, customTitle = '') {
+      const spec = featureSpecs[name];
+      const title = escapeHTML((customTitle || spec.title).trim().slice(0, 22));
+      return `<svg viewBox="0 0 640 230" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:auto;"><defs><linearGradient id="${name}-bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${spec.bg1}"/><stop offset="1" stop-color="${spec.bg2}"/></linearGradient></defs><rect width="640" height="230" rx="2" fill="url(#${name}-bg)"/>${featureMotifs[name]}<circle cx="178" cy="56" r="3" fill="${spec.accent}"><animate attributeName="opacity" values="0.2;1;0.2" dur="2.6s" repeatCount="indefinite"/></circle><circle cx="470" cy="176" r="2.5" fill="#8b5cf6"><animate attributeName="opacity" values="1;0.2;1" dur="3.4s" repeatCount="indefinite"/></circle><text x="320" y="91" text-anchor="middle" fill="${spec.accent}" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif" font-size="13" font-weight="700" letter-spacing="4">${spec.label}</text><text x="320" y="137" text-anchor="middle" fill="${spec.ink}" font-family="'Songti SC',STSong,serif" font-size="28" font-weight="700">${title}</text><line x1="236" y1="158" x2="404" y2="158" stroke="${spec.accent}" stroke-width="2"/><text x="320" y="188" text-anchor="middle" fill="${spec.ink}" opacity="0.7" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif" font-size="12" letter-spacing="3">${spec.sub}</text></svg>`;
+    }
+
+    function colorTheme(label, ink, background, accent, soft, centered = false) {
+      const alignment = centered ? 'text-align:center;' : '';
+      return {
+        label,
+        root: `color:${ink};background-color:${background};padding:20px 18px;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;font-size:16px;line-height:1.95;letter-spacing:0.04em;word-break:break-word;`,
+        heading: `margin:48px 0 24px;padding:13px 16px;border-left:4px solid ${accent};border-bottom:1px solid ${accent};background-color:${soft};${alignment}`,
+        headingText: `margin:0;color:${accent};font-size:20px;line-height:1.5;font-weight:700;letter-spacing:0.04em;`,
+        marker: `color:${accent};font-size:14px;`,
+        quote: `margin:32px 0;padding:18px 20px;border-left:3px solid ${accent};border-right:3px solid ${accent};background-color:${soft};${alignment}`,
+        quoteText: `margin:0;color:${ink};font-family:'Songti SC',STSong,serif;font-size:18px;line-height:1.85;`,
+        strong: `color:${accent};font-weight:700;`,
+        flow: `margin:32px 0;padding:17px 12px;border-top:1px solid ${accent};border-bottom:1px solid ${accent};background-color:${soft};text-align:center;`,
+        flowText: `margin:0;color:${accent};font-size:15px;font-weight:700;letter-spacing:0.08em;`,
+        footer: `margin:54px 0 0;padding-top:16px;border-top:1px solid ${accent};text-align:${centered ? 'center' : 'right'};`,
+        footerText: `margin:0;color:${accent};font-size:11px;font-weight:700;letter-spacing:0.18em;`,
+        caption: `margin:10px 0 0;color:${ink};opacity:.65;font-size:12px;line-height:1.6;text-align:center;letter-spacing:0.08em;`
+      };
+    }
+
+    const themes = {
+      editorial: {
+        label: '墨绿编辑部',
+        root: "color:#24312d;background-color:#f7fbf9;padding:20px 18px;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;font-size:16px;line-height:1.9;letter-spacing:0.04em;word-break:break-word;",
+        heading: 'margin:48px 0 24px;padding-top:14px;border-top:1px solid #bad4cb;',
+        headingText: 'margin:0;color:#0b7a65;font-size:20px;line-height:1.5;font-weight:700;letter-spacing:0.04em;',
+        marker: 'color:#8b5cf6;font-size:14px;',
+        quote: 'margin:32px 0;padding:16px 18px 16px 20px;border-left:3px solid #0b7a65;background-color:#f2f7f4;',
+        quoteText: "margin:0;color:#24312d;font-family:'Songti SC',STSong,serif;font-size:18px;line-height:1.8;",
+        strong: 'color:#0b7a65;font-weight:700;',
+        flow: 'margin:32px 0;padding:17px 12px;border-top:1px solid #0b7a65;border-bottom:1px solid #0b7a65;text-align:center;',
+        flowText: 'margin:0;color:#0b7a65;font-size:15px;font-weight:700;letter-spacing:0.08em;',
+        footer: 'margin:54px 0 0;padding-top:16px;border-top:1px solid #d7e3de;text-align:right;',
+        footerText: 'margin:0;color:#0b7a65;font-size:11px;font-weight:700;letter-spacing:0.18em;',
+        caption: 'margin:10px 0 0;color:#7a8580;font-size:12px;line-height:1.6;text-align:center;letter-spacing:0.08em;'
+      },
+      paper: {
+        label: '暖纸手记',
+        root: "color:#4a3a31;background-color:#fff9ed;padding:20px 18px;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;font-size:16px;line-height:1.95;letter-spacing:0.04em;word-break:break-word;",
+        heading: 'margin:48px 0 24px;padding:14px 16px;border-left:4px solid #b85c3c;border-top:1px solid #e0c49d;border-bottom:1px solid #e0c49d;background-color:#fbefd8;',
+        headingText: 'margin:0;color:#9d432d;font-size:20px;line-height:1.5;font-weight:700;letter-spacing:0.04em;',
+        marker: 'color:#d39b3c;font-size:14px;',
+        quote: 'margin:32px 0;padding:18px 20px;border-top:1px solid #b85c3c;border-bottom:1px solid #b85c3c;background-color:#fff4df;',
+        quoteText: "margin:0;color:#4a3a31;font-family:'Songti SC',STSong,serif;font-size:18px;line-height:1.85;text-align:center;",
+        strong: 'color:#a24731;font-weight:700;',
+        flow: 'margin:32px 0;padding:17px 12px;border-top:1px solid #c98254;border-bottom:1px solid #c98254;background-color:#fff4df;text-align:center;',
+        flowText: 'margin:0;color:#9d432d;font-size:15px;font-weight:700;letter-spacing:0.08em;',
+        footer: 'margin:54px 0 0;padding-top:16px;border-top:1px solid #e0c49d;text-align:center;',
+        footerText: 'margin:0;color:#9d432d;font-size:11px;font-weight:700;letter-spacing:0.18em;',
+        caption: 'margin:10px 0 0;color:#8b7465;font-size:12px;line-height:1.6;text-align:center;letter-spacing:0.08em;'
+      },
+      tech: {
+        label: '蓝色科技',
+        root: "color:#26344f;background-color:#f8fbff;padding:20px 18px;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;font-size:16px;line-height:1.9;letter-spacing:0.035em;word-break:break-word;",
+        heading: 'margin:48px 0 24px;padding:14px 16px;border-left:5px solid #2456d6;border-top:1px solid #a9bff5;background-color:#eaf1ff;',
+        headingText: 'margin:0;color:#1745bc;font-size:20px;line-height:1.5;font-weight:800;letter-spacing:0.03em;',
+        marker: 'color:#09a9c7;font-size:14px;',
+        quote: 'margin:32px 0;padding:18px 20px;border-left:4px solid #2456d6;background-color:#eaf1ff;',
+        quoteText: "margin:0;color:#26344f;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;font-size:17px;line-height:1.8;",
+        strong: 'color:#1745bc;font-weight:800;',
+        flow: 'margin:32px 0;padding:17px 12px;border-top:2px solid #2456d6;border-bottom:2px solid #2456d6;background-color:#edf4ff;text-align:center;',
+        flowText: 'margin:0;color:#1745bc;font-size:15px;font-weight:800;letter-spacing:0.06em;',
+        footer: 'margin:54px 0 0;padding-top:16px;border-top:1px solid #a9bff5;text-align:right;',
+        footerText: 'margin:0;color:#1745bc;font-size:11px;font-weight:800;letter-spacing:0.16em;',
+        caption: 'margin:10px 0 0;color:#68789a;font-size:12px;line-height:1.6;text-align:center;letter-spacing:0.08em;'
+      },
+      spring: {
+        label: '春日绿意',
+        root: "color:#35442f;background-color:#fbfdf7;padding:20px 18px;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;font-size:16px;line-height:1.95;letter-spacing:0.04em;word-break:break-word;",
+        heading: 'margin:48px 0 24px;padding:13px 16px;border:1px solid #a8c58b;background-color:#eff7e5;text-align:center;',
+        headingText: 'margin:0;color:#568336;font-size:20px;line-height:1.5;font-weight:700;letter-spacing:0.04em;',
+        marker: 'color:#e1a82f;font-size:14px;',
+        quote: 'margin:32px 0;padding:18px 20px;border-left:3px solid #679645;border-right:3px solid #679645;background-color:#f2f8e9;',
+        quoteText: "margin:0;color:#35442f;font-family:'Songti SC',STSong,serif;font-size:18px;line-height:1.85;text-align:center;",
+        strong: 'color:#568336;font-weight:700;',
+        flow: 'margin:32px 0;padding:17px 12px;border:1px solid #a8c58b;background-color:#eff7e5;text-align:center;',
+        flowText: 'margin:0;color:#568336;font-size:15px;font-weight:700;letter-spacing:0.08em;',
+        footer: 'margin:54px 0 0;padding-top:16px;border-top:1px solid #a8c58b;text-align:center;',
+        footerText: 'margin:0;color:#568336;font-size:11px;font-weight:700;letter-spacing:0.18em;',
+        caption: 'margin:10px 0 0;color:#708166;font-size:12px;line-height:1.6;text-align:center;letter-spacing:0.08em;'
+      },
+      red: {
+        label: '红色宣言',
+        root: "color:#402b2b;background-color:#fff9f7;padding:20px 18px;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;font-size:16px;line-height:1.9;letter-spacing:0.035em;word-break:break-word;",
+        heading: 'margin:48px 0 24px;padding:13px 16px;border-top:4px solid #b51f2a;border-bottom:1px solid #b51f2a;background-color:#fff0ed;',
+        headingText: 'margin:0;color:#a41621;font-size:20px;line-height:1.5;font-weight:800;letter-spacing:0.03em;',
+        marker: 'color:#d4a72c;font-size:14px;',
+        quote: 'margin:32px 0;padding:18px 20px;border:3px double #d0a43a;background-color:#b51f2a;',
+        quoteText: "margin:0;color:#ffffff;font-family:'Songti SC',STSong,serif;font-size:18px;line-height:1.85;text-align:center;",
+        strong: 'color:#ffe39a;font-weight:800;',
+        flow: 'margin:32px 0;padding:17px 12px;border-top:2px solid #b51f2a;border-bottom:2px solid #b51f2a;background-color:#fff0ed;text-align:center;',
+        flowText: 'margin:0;color:#a41621;font-size:15px;font-weight:800;letter-spacing:0.08em;',
+        footer: 'margin:54px 0 0;padding-top:16px;border-top:1px solid #d9b1aa;text-align:right;',
+        footerText: 'margin:0;color:#a41621;font-size:11px;font-weight:800;letter-spacing:0.18em;',
+        caption: 'margin:10px 0 0;color:#8a6663;font-size:12px;line-height:1.6;text-align:center;letter-spacing:0.08em;'
+      },
+      mono: {
+        label: '黑白极简',
+        root: "color:#222222;background-color:#ffffff;padding:20px 18px;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;font-size:16px;line-height:1.95;letter-spacing:0.045em;word-break:break-word;",
+        heading: 'margin:48px 0 24px;padding:12px 0;border-top:3px solid #181818;border-bottom:1px solid #181818;',
+        headingText: 'margin:0;color:#181818;font-size:20px;line-height:1.5;font-weight:800;letter-spacing:0.035em;',
+        marker: 'color:#777777;font-size:14px;',
+        quote: 'margin:32px 0;padding:18px 20px;border-left:6px solid #181818;background-color:#f2f2f2;',
+        quoteText: "margin:0;color:#181818;font-family:'Songti SC',STSong,serif;font-size:18px;line-height:1.85;",
+        strong: 'color:#181818;font-weight:800;',
+        flow: 'margin:32px 0;padding:17px 12px;border:1px solid #181818;background-color:#ffffff;text-align:center;',
+        flowText: 'margin:0;color:#181818;font-size:15px;font-weight:800;letter-spacing:0.08em;',
+        footer: 'margin:54px 0 0;padding-top:16px;border-top:3px solid #181818;text-align:right;',
+        footerText: 'margin:0;color:#181818;font-size:11px;font-weight:800;letter-spacing:0.18em;',
+        caption: 'margin:10px 0 0;color:#666666;font-size:12px;line-height:1.6;text-align:center;letter-spacing:0.08em;'
+      },
+      autumn: {
+        label: '秋日流光 · SVG',
+        root: "color:#493a2f;background-color:#fffaf0;padding:20px 18px;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;font-size:16px;line-height:1.95;letter-spacing:0.04em;word-break:break-word;",
+        heading: 'margin:48px 0 24px;padding:13px 16px;border-left:3px solid #b56b31;border-right:3px solid #8d8f3f;background-color:#fff1d3;text-align:center;',
+        headingText: 'margin:0;color:#9b5a2d;font-size:20px;line-height:1.5;font-weight:700;letter-spacing:0.04em;',
+        marker: 'color:#8b5cf6;font-size:14px;',
+        quote: 'margin:32px 0;padding:18px 20px;border-top:1px solid #c98843;border-bottom:1px solid #c98843;background-color:#fff4df;',
+        quoteText: "margin:0;color:#493a2f;font-family:'Songti SC',STSong,serif;font-size:18px;line-height:1.85;text-align:center;",
+        strong: 'color:#a65c2d;font-weight:700;',
+        flow: 'margin:32px 0;padding:17px 12px;border:1px solid #c98843;background-color:#fff1d3;text-align:center;',
+        flowText: 'margin:0;color:#9b5a2d;font-size:15px;font-weight:700;letter-spacing:0.08em;',
+        footer: 'margin:54px 0 0;padding-top:16px;border-top:1px solid #d7b47e;text-align:center;',
+        footerText: 'margin:0;color:#9b5a2d;font-size:11px;font-weight:700;letter-spacing:0.18em;',
+        caption: 'margin:10px 0 0;color:#8a745d;font-size:12px;line-height:1.6;text-align:center;letter-spacing:0.08em;'
+      },
+      violet: colorTheme('紫雾灵感', '#3b3048', '#fcf9ff', '#7652a8', '#f0e8fa', true),
+      ocean: colorTheme('海盐蓝调', '#244047', '#f4fcfd', '#238ca0', '#e3f5f7'),
+      coffee: colorTheme('咖啡书页', '#47392f', '#fcf8f3', '#79533d', '#f0e3d5'),
+      peach: colorTheme('桃气手帐', '#4d343a', '#fff9f8', '#cf6f80', '#fae7ea', true)
+    };
+
+    function isWechatImageUrl(url) {
+      return /^https?:\/\/mmbiz\.qpic\.cn\//.test(url);
+    }
+
+    function wechatImageUrl(image) {
+      return image?.dataset.wechatSrc || (isWechatImageUrl(image?.src || '') ? image.src : '');
+    }
+
+    function prepareImageSlots() {
+      article.querySelectorAll('[data-role="image"]').forEach((section, index) => {
+        section.dataset.imageIndex = index;
+        const imageKey = section.dataset.imageKey || String(index);
+        section.dataset.imageKey = imageKey;
+        const visual = section.querySelector('img, [data-image-slot]');
+        if (!visual) return;
+        visual.dataset.imageSlot = imageKey;
+        visual.tabIndex = 0;
+        if (visual.tagName === 'IMG') visual.setAttribute('aria-label', '粘贴新图片可替换当前图片');
+        let actions = section.querySelector('[data-image-actions]');
+        if (!actions) {
+          actions = document.createElement('div');
+          actions.className = 'image-actions';
+          actions.dataset.imageActions = '';
+          actions.dataset.editorOnly = '';
+          section.querySelector('p')?.before(actions);
+        }
+        const isWechatImage = visual.tagName === 'IMG' && Boolean(wechatImageUrl(visual));
+        actions.innerHTML = `<button type="button" data-upload-wechat="${escapeHTML(imageKey)}" ${visual.tagName === 'IMG' && !isWechatImage ? '' : 'disabled'}>${isWechatImage ? '已上传微信' : '上传到微信'}</button><span>${isWechatImage ? '复制源码时会保留微信图片' : visual.tagName === 'IMG' ? '准备上传' : '先粘贴或选择图片'}</span>`;
+      });
+    }
+
+    function applyTheme(name) {
+      const theme = themes[name];
+      activeTheme = name;
+      article.setAttribute('style', theme.root);
+      const feature = article.querySelector('[data-role="feature"]');
+      if (feature) {
+        feature.hidden = false;
+        feature.setAttribute('style', `margin:0 0 34px;overflow:hidden;background-color:${featureSpecs[name].bg1};`);
+        feature.innerHTML = buildFeature(name, titleInput.value);
+      }
+      article.querySelectorAll('[data-role="heading"]').forEach(element => {
+        element.setAttribute('style', theme.heading);
+        element.querySelector('p').setAttribute('style', theme.headingText);
+        element.querySelectorAll('span').forEach(span => span.setAttribute('style', theme.marker));
+      });
+      article.querySelectorAll('[data-role="quote"]').forEach(element => {
+        element.setAttribute('style', theme.quote);
+        element.querySelector('p').setAttribute('style', theme.quoteText);
+      });
+      article.querySelectorAll('[data-role="flow"]').forEach(flow => {
+        flow.setAttribute('style', theme.flow);
+        flow.querySelector('p').setAttribute('style', theme.flowText);
+        flow.querySelectorAll('span').forEach(span => span.setAttribute('style', theme.marker));
+      });
+      article.querySelectorAll('[data-role="footer"]').forEach(footer => {
+        footer.setAttribute('style', theme.footer);
+        footer.querySelector('p').setAttribute('style', theme.footerText);
+      });
+      article.querySelectorAll('[data-role="image"] p').forEach(caption => caption.setAttribute('style', theme.caption));
+      article.querySelectorAll('[data-role="divider"]').forEach(divider => divider.setAttribute('style', `margin:34px 0;color:${featureSpecs[name].accent};font-size:12px;letter-spacing:.65em;text-align:center;`));
+      article.querySelectorAll('strong').forEach(strong => strong.setAttribute('style', theme.strong));
+      prepareImageSlots();
+      document.querySelectorAll('.theme-card').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.theme === name)));
+      statusText.textContent = `已应用：${theme.label}`;
+      saveEditorState();
+    }
+
+    document.querySelectorAll('.theme-card').forEach(button => {
+      button.addEventListener('click', () => applyTheme(button.dataset.theme));
+    });
+
+    function inlineMarkdown(text) {
+      return escapeHTML(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    }
+
+    function splitFrontMatter(markdown) {
+      const match = markdown.match(/^---\s*\n([\s\S]*?)\n---\s*(?:\n|$)/);
+      if (!match) return { body: markdown, meta: {} };
+      const meta = {};
+      match[1].split('\n').forEach(line => {
+        const field = line.match(/^([A-Za-z][\w-]*):\s*(.*?)\s*$/);
+        if (field) meta[field[1].toLowerCase()] = field[2].replace(/^(["'])(.*)\1$/, '$2');
+      });
+      return { body: markdown.slice(match[0].length), meta };
+    }
+
+    function renderMarkdown(markdown) {
+      const lines = markdown.replace(/\r\n?/g, '\n').split('\n');
+      const blocks = [];
+      let paragraph = [];
+      let headingNumber = 0;
+      let imageNumber = 0;
+      const imageOccurrences = new Map();
+      const flushParagraph = () => {
+        if (!paragraph.length) return;
+        blocks.push(`<p style="margin:0 0 22px;">${inlineMarkdown(paragraph.join(' '))}</p>`);
+        paragraph = [];
+      };
+
+      for (let index = 0; index < lines.length; index += 1) {
+        const line = lines[index].trim();
+        if (!line) { flushParagraph(); continue; }
+        if (/^#\s+/.test(line)) { flushParagraph(); continue; }
+        if (/^##\s+/.test(line)) {
+          flushParagraph();
+          headingNumber += 1;
+          const heading = inlineMarkdown(line.replace(/^##\s+/, ''));
+          blocks.push(`<section data-role="heading"><p>${String(headingNumber).padStart(2, '0')}｜${heading} <span>●</span></p></section>`);
+          continue;
+        }
+        if (line.startsWith('>')) {
+          flushParagraph();
+          const quote = inlineMarkdown(line.replace(/^>\s?/, ''));
+          blocks.push(`<section data-role="quote"><p>${quote}</p></section>`);
+          continue;
+        }
+        const listItem = line.match(/^([-*+] |\d+[.)] )(.*)$/);
+        if (listItem) {
+          flushParagraph();
+          const ordered = /^\d/.test(listItem[1]);
+          const items = [listItem[2]];
+          while (index + 1 < lines.length) {
+            const next = lines[index + 1].trim().match(/^([-*+] |\d+[.)] )(.*)$/);
+            if (!next || /^\d/.test(next[1]) !== ordered) break;
+            items.push(next[2]);
+            index += 1;
+          }
+          const tag = ordered ? 'ol' : 'ul';
+          blocks.push(`<${tag} style="margin:0 0 22px;padding-left:1.5em;">${items.map(item => `<li style="margin:0 0 8px;">${inlineMarkdown(item)}</li>`).join('')}</${tag}>`);
+          continue;
+        }
+        if (line === '---') {
+          flushParagraph();
+          blocks.push('<p data-role="divider">✦ ✦ ✦</p>');
+          continue;
+        }
+        const component = line.match(/^:::(lead|highlight|flow|image|footer|callout)(?:\s+([A-Za-z0-9_-]+))?$/);
+        if (component) {
+          flushParagraph();
+          const [, type, explicitId] = component;
+          const content = [];
+          while (++index < lines.length && lines[index].trim() !== ':::') content.push(lines[index].trim());
+          const value = inlineMarkdown(content.join(' '));
+          if (type === 'lead') blocks.push(`<section data-role="quote"><p>${value}</p></section>`);
+          if (type === 'highlight') blocks.push(`<section data-role="quote"><p><strong>${value}</strong></p></section>`);
+          if (type === 'callout') blocks.push(`<section data-role="quote"><p>${explicitId === 'warning' ? `<strong>${value}</strong>` : value}</p></section>`);
+          if (type === 'flow') blocks.push(`<section data-role="flow"><p>${value.replace(/→/g, '<span>→</span>')}</p></section>`);
+          if (type === 'image') {
+            const imageIndex = imageNumber++;
+            const caption = content.join(' ').trim() || '文章配图';
+            const occurrence = (imageOccurrences.get(caption) || 0) + 1;
+            imageOccurrences.set(caption, occurrence);
+            // ponytail: captions are fallback IDs; explicit IDs handle duplicate or frequently edited captions.
+            const imageKey = explicitId || `caption:${caption}:${occurrence}`;
+            const imageAsset = imageAssets.get(imageKey);
+            const imageSource = typeof imageAsset === 'string' ? imageAsset : imageAsset?.preview;
+            const wechatAttribute = typeof imageAsset === 'object' && imageAsset?.wechat ? ` data-wechat-src="${escapeHTML(imageAsset.wechat)}"` : '';
+            const visual = imageSource
+              ? `<img data-image-slot="${escapeHTML(imageKey)}"${wechatAttribute} src="${escapeHTML(imageSource)}" alt="${escapeHTML(caption)}" style="display:block;width:100%;height:auto;border:0;">`
+              : `<div class="image-slot" data-image-slot="${escapeHTML(imageKey)}" tabindex="0" role="button" aria-label="粘贴或选择图片" style="padding:40px 18px;border:1px dashed #9fb8ae;color:#6c7a74;background-color:#ffffff;text-align:center;font-size:13px;line-height:1.8;">点击这里后按 ⌘V 粘贴图片<br><button type="button" data-pick-image="${escapeHTML(imageKey)}">选择本地图片</button></div>`;
+            blocks.push(`<section data-role="image" data-image-key="${escapeHTML(imageKey)}" data-image-index="${imageIndex}" style="margin:32px 0 38px;">${visual}<p>${value}</p></section>`);
+          }
+          if (type === 'footer') blocks.push(`<section data-role="footer"><p>${value}</p></section>`);
+          continue;
+        }
+        paragraph.push(line);
+      }
+      flushParagraph();
+      return blocks.join('');
+    }
+
+    function saveEditorState() {
+      localStorage.setItem(draftKey, JSON.stringify({
+        title: titleInput.value,
+        byline: bylineInput.value,
+        markdown: markdownInput.value,
+        theme: activeTheme
+      }));
+    }
+
+    function renderEditorArticle(showMessage = true) {
+      const source = markdownInput.value.trim().replace(/\r\n?/g, '\n');
+      const { body: markdown, meta } = splitFrontMatter(source);
+      if (!markdown) {
+        if (showMessage) showToast('请先粘贴文章正文');
+        return false;
+      }
+      const firstHeading = markdown.match(/^#\s+(.+)$/m);
+      if (meta.title) titleInput.value = meta.title;
+      else if (firstHeading) titleInput.value = firstHeading[1].trim();
+      if (meta.author) bylineInput.value = meta.author;
+      document.querySelector('#previewTitle').textContent = titleInput.value.trim() || '未命名文章';
+      document.querySelector('#previewByline').textContent = bylineInput.value.trim();
+      article.innerHTML = '<section data-role="feature"></section>' + renderMarkdown(markdown);
+      applyTheme(activeTheme);
+      if (showMessage) showToast('文章已排版，可直接复制富文本');
+      return true;
+    }
+
+    const componentSnippets = {
+      heading: '\n\n## 在这里填写小标题\n\n',
+      quote: '\n\n> 在这里填写引用或观点\n\n',
+      highlight: '\n\n:::highlight\n把最想让读者记住的一句话写在这里\n:::\n\n',
+      flow: '\n\n:::flow\n记录 → 思考 → 表达 → 发布\n:::\n\n',
+      image: '\n\n:::image\n在这里填写图片说明\n:::\n\n',
+      divider: '\n\n---\n\n',
+      footer: '\n\n:::footer\nTANG ZELONG · FIELD NOTES\n:::\n'
+    };
+
+    function componentSnippet(type) {
+      return type === 'image'
+        ? `\n\n:::image image-${crypto.randomUUID()}\n在这里填写图片说明\n:::\n\n`
+        : componentSnippets[type];
+    }
+
+    document.querySelectorAll('[data-component]').forEach(button => {
+      button.addEventListener('click', () => {
+        const snippet = componentSnippet(button.dataset.component);
+        markdownInput.setRangeText(snippet, markdownInput.selectionStart, markdownInput.selectionEnd, 'end');
+        markdownInput.focus();
+        saveEditorState();
+      });
+    });
+
+    function putImageInSlot(file, imageKey) {
+      if (!file || !file.type.startsWith('image/')) return showToast('剪贴板里没有图片');
+      if (!['image/png', 'image/jpeg'].includes(file.type)) return showToast('只支持 JPG 或 PNG 图片');
+      if (file.size >= 1024 * 1024) return showToast('微信图片必须小于 1 MB，请先压缩');
+      const reader = new FileReader();
+      reader.onload = () => {
+        const source = String(reader.result);
+        imageAssets.set(imageKey, { preview: source });
+        const section = [...article.querySelectorAll('[data-role="image"]')].find(item => item.dataset.imageKey === imageKey);
+        const visual = section?.querySelector('[data-image-slot]');
+        if (visual) {
+          const image = document.createElement('img');
+          image.src = source;
+          image.alt = section.querySelector('p')?.textContent || '文章配图';
+          image.dataset.imageSlot = imageKey;
+          image.tabIndex = 0;
+          image.setAttribute('aria-label', '粘贴新图片可替换当前图片');
+          image.setAttribute('style', 'display:block;width:100%;height:auto;border:0;');
+          visual.replaceWith(image);
+          prepareImageSlots();
+        }
+        showToast('图片已放入正文，可直接复制富文本');
+      };
+      reader.onerror = () => showToast('图片读取失败，请重新选择');
+      reader.readAsDataURL(file);
+    }
+
+    async function imageAsDataUrl(image) {
+      if (image.src.startsWith('data:')) return image.src;
+      const response = await fetch(image.src);
+      if (!response.ok) throw new Error('图片读取失败');
+      const blob = await response.blob();
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    async function uploadSlotToWechat(section, button) {
+      const image = section.querySelector('img');
+      if (!image) return showToast('请先粘贴或选择一张图片');
+      if (!confirm('将这张图片上传到当前配置的微信公众号？')) return;
+      const imageKey = section.dataset.imageKey;
+      const previewSource = image.src;
+      button.disabled = true;
+      button.textContent = '正在上传…';
+      try {
+        const response = await fetch('/api/wechat/upload-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data_url: await imageAsDataUrl(image) })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || '上传失败');
+        const liveSection = [...article.querySelectorAll('[data-role="image"]')].find(item => item.dataset.imageKey === imageKey);
+        const liveImage = liveSection?.querySelector('img');
+        if (!liveImage || liveImage.src !== previewSource) throw new Error('图片已更换，请重新上传');
+        liveImage.dataset.wechatSrc = result.url;
+        imageAssets.set(imageKey, { preview: previewSource, wechat: result.url });
+        prepareImageSlots();
+        showToast('图片已上传微信，正文地址已自动替换');
+      } catch (error) {
+        button.disabled = false;
+        button.textContent = '上传到微信';
+        showToast(error.message);
+      }
+    }
+
+    document.addEventListener('paste', event => {
+      const imageItem = [...(event.clipboardData?.items || [])].find(item => item.type.startsWith('image/'));
+      if (!imageItem) return;
+      const targetSlot = event.target.closest?.('[data-image-slot]');
+      let imageKey;
+      if (targetSlot) {
+        imageKey = targetSlot.dataset.imageSlot;
+      } else if (event.target === markdownInput) {
+        imageKey = `image-${crypto.randomUUID()}`;
+        markdownInput.setRangeText(componentSnippet('image').replace(/image-[A-Fa-f0-9-]+/, imageKey), markdownInput.selectionStart, markdownInput.selectionEnd, 'end');
+        saveEditorState();
+        renderEditorArticle(false);
+      } else {
+        return;
+      }
+      event.preventDefault();
+      putImageInSlot(imageItem.getAsFile(), imageKey);
+    });
+
+    article.addEventListener('click', event => {
+      const picker = event.target.closest?.('[data-pick-image]');
+      const uploader = event.target.closest?.('[data-upload-wechat]');
+      if (uploader) {
+        uploadSlotToWechat(uploader.closest('[data-role="image"]'), uploader);
+      } else if (picker) {
+        selectedImageSlot = picker.dataset.pickImage;
+        imageFileInput.value = '';
+        imageFileInput.click();
+      } else if (event.target.closest?.('[data-image-slot]')) {
+        showToast('现在按 ⌘V，可以替换这张图片');
+      }
+    });
+
+    imageFileInput.addEventListener('change', () => putImageInSlot(imageFileInput.files[0], selectedImageSlot));
+
+    fetch('/api/wechat/status')
+      .then(response => response.json())
+      .then(result => { wechatStatus.textContent = `微信图片接口：${result.configured ? '已配置，可以上传' : '未配置，请先运行 python3 server.py configure'}`; })
+      .catch(() => { wechatStatus.textContent = '微信图片接口：服务未启动'; });
+
+    document.querySelector('#renderButton').addEventListener('click', () => renderEditorArticle());
+    markdownInput.addEventListener('keydown', event => {
+      if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+        event.preventDefault();
+        renderEditorArticle();
+      }
+    });
+    [titleInput, bylineInput, markdownInput].forEach(input => input.addEventListener('input', saveEditorState));
+
+    async function cloneWithInlineImages() {
+      const clone = article.cloneNode(true);
+      replaceFeatureForExport(clone);
+      clone.querySelectorAll('[hidden]').forEach(element => element.remove());
+      clone.querySelectorAll('[data-editor-only]').forEach(element => element.remove());
+      clone.querySelectorAll('[data-pick-image]').forEach(button => button.remove());
+      clone.querySelectorAll('.image-slot').forEach(slot => {
+        slot.textContent = '〔请在公众号中插入图片〕';
+        slot.removeAttribute('class');
+        slot.removeAttribute('role');
+        slot.removeAttribute('tabindex');
+        slot.removeAttribute('aria-label');
+      });
+      const sourceImages = [...article.querySelectorAll('img')];
+      const clonedImages = [...clone.querySelectorAll('img')];
+      await Promise.all(sourceImages.map(async (image, index) => {
+        const wechatUrl = wechatImageUrl(image);
+        if (wechatUrl) {
+          clonedImages[index].src = wechatUrl;
+          clonedImages[index].removeAttribute('data-wechat-src');
+          return;
+        }
+        const response = await fetch(image.src);
+        if (!response.ok) throw new Error('正文图片读取失败');
+        const blob = await response.blob();
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        clonedImages[index].setAttribute('src', dataUrl);
+      }));
+      clone.querySelectorAll('[data-image-slot]').forEach(element => {
+        element.removeAttribute('data-image-slot');
+        element.removeAttribute('tabindex');
+        element.removeAttribute('aria-label');
+      });
+      clone.querySelectorAll('[data-image-index]').forEach(element => element.removeAttribute('data-image-index'));
+      clone.removeAttribute('id');
+      return clone;
+    }
+
+    async function buildExportDocument() {
+      const clone = await cloneWithInlineImages();
+      return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHTML(titleInput.value || '公众号文章')}</title></head><body style="margin:0;padding:24px 16px;background:#ffffff;"><div style="max-width:677px;margin:0 auto;">${clone.outerHTML}</div></body></html>`;
+    }
+
+    function buildSourceCode() {
+      const clone = article.cloneNode(true);
+      replaceFeatureForExport(clone);
+      clone.querySelectorAll('[hidden]').forEach(element => element.remove());
+      clone.querySelectorAll('[data-editor-only]').forEach(element => element.remove());
+      clone.querySelectorAll('[data-pick-image]').forEach(button => button.remove());
+      clone.querySelectorAll('.image-slot').forEach(slot => {
+        slot.textContent = '〔请在公众号中插入图片〕';
+        slot.removeAttribute('class');
+        slot.removeAttribute('role');
+        slot.removeAttribute('tabindex');
+        slot.removeAttribute('aria-label');
+        slot.removeAttribute('data-image-slot');
+      });
+      clone.removeAttribute('id');
+      clone.querySelectorAll('img').forEach(image => {
+        const wechatUrl = wechatImageUrl(image);
+        if (wechatUrl) {
+          image.src = wechatUrl;
+          image.removeAttribute('data-wechat-src');
+          image.removeAttribute('data-image-slot');
+          image.removeAttribute('tabindex');
+          image.removeAttribute('aria-label');
+          return;
+        }
+        const placeholder = document.createElement('p');
+        placeholder.setAttribute('style', 'margin:18px 0;padding:18px;border:1px dashed #bad4cb;color:#0b7a65;background-color:#f7faf8;font-size:13px;line-height:1.7;text-align:center;');
+        placeholder.textContent = `〔请在此插入正文图片：${image.alt || '文章配图'}〕`;
+        image.replaceWith(placeholder);
+      });
+      clone.querySelectorAll('[data-image-index]').forEach(element => element.removeAttribute('data-image-index'));
+      return clone.outerHTML;
+    }
+
+    function replaceFeatureForExport(clone) {
+      const feature = clone.querySelector('[data-role="feature"]');
+      if (!feature) return;
+      const spec = featureSpecs[activeTheme];
+      feature.innerHTML = '';
+      feature.setAttribute('style', `margin:0 0 34px;padding:28px 22px;border-top:5px solid ${spec.accent};border-bottom:1px solid ${spec.bg2};background-color:${spec.bg1};text-align:center;`);
+      const label = document.createElement('p');
+      label.setAttribute('style', `margin:0 0 12px;color:${spec.accent};font-size:11px;font-weight:700;letter-spacing:.18em;`);
+      label.textContent = spec.label;
+      const title = document.createElement('p');
+      title.setAttribute('style', `margin:0;color:${spec.ink};font-size:24px;line-height:1.45;font-weight:800;`);
+      title.textContent = titleInput.value.trim() || spec.title;
+      const sub = document.createElement('p');
+      sub.setAttribute('style', `margin:12px 0 0;color:${spec.accent};font-size:12px;letter-spacing:.16em;`);
+      sub.textContent = spec.sub;
+      feature.append(label, title, sub);
+    }
+
+    document.querySelector('#copySourceButton').addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(buildSourceCode());
+        showToast('HTML 源码已复制；请先关闭壹伴 MD');
+      } catch (error) {
+        console.error(error);
+        showToast('源码复制失败，请使用下载 HTML');
+      }
+    });
+
+    document.querySelector('#copyButton').addEventListener('click', async () => {
+      try {
+        const clone = await cloneWithInlineImages();
+        const copyArea = document.createElement('div');
+        copyArea.contentEditable = 'true';
+        copyArea.style.position = 'fixed';
+        copyArea.style.left = '-9999px';
+        copyArea.style.backgroundColor = '#ffffff';
+        const exportWrap = document.createElement('div');
+        exportWrap.style.backgroundColor = '#ffffff';
+        exportWrap.append(clone);
+        copyArea.append(exportWrap);
+        document.body.append(copyArea);
+        const range = document.createRange();
+        range.selectNode(exportWrap);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        const copied = document.execCommand('copy');
+        selection.removeAllRanges();
+        copyArea.remove();
+        if (!copied) throw new Error('浏览器拒绝复制富文本');
+        showToast('已复制，可粘贴到壹伴');
+      } catch (error) {
+        console.error(error);
+        showToast('复制失败，请使用下载 HTML');
+      }
+    });
+
+    document.querySelector('#downloadButton').addEventListener('click', async () => {
+      try {
+        const html = await buildExportDocument();
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
+        link.download = `${(titleInput.value || '公众号文章').replace(/[\\/:*?"<>|]/g, '').slice(0, 32)}-公众号.html`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+        showToast('HTML 已下载');
+      } catch (error) {
+        console.error(error);
+        showToast('下载失败：正文图片无法读取');
+      }
+    });
+
+    try {
+      const savedDraft = JSON.parse(localStorage.getItem(draftKey) || 'null');
+      if (savedDraft) {
+        titleInput.value = savedDraft.title || titleInput.value;
+        bylineInput.value = savedDraft.byline || bylineInput.value;
+        markdownInput.value = savedDraft.markdown || '';
+        activeTheme = themes[savedDraft.theme] ? savedDraft.theme : activeTheme;
+      }
+    } catch (error) {
+      console.warn('本地草稿无法读取，已使用默认内容', error);
+    }
+
+    if (!renderEditorArticle(false)) applyTheme(activeTheme);
+
+    const parserCheck = document.createElement('div');
+    parserCheck.innerHTML = renderMarkdown('## 小标题\n\n> 引用\n\n:::flow\n记录 → 发布\n:::\n\n:::image\n配图\n:::\n\n:::footer\n署名\n:::');
+    const wechatPreviewCheck = document.createElement('img');
+    wechatPreviewCheck.dataset.wechatSrc = 'http://mmbiz.qpic.cn/test.jpg';
+
+    const checks = [
+      Object.keys(themes).length === 11,
+      Object.keys(featureSpecs).length === 11,
+      article.querySelectorAll('[data-role="feature"] svg').length === 1,
+      article.querySelectorAll('[data-role="feature"] animate, [data-role="feature"] animateTransform, [data-role="feature"] animateMotion').length === 4,
+      parserCheck.querySelectorAll('[data-role="heading"], [data-role="quote"], [data-role="flow"], [data-role="image"], [data-role="footer"]').length === 5,
+      isWechatImageUrl('http://mmbiz.qpic.cn/test.jpg') && isWechatImageUrl('https://mmbiz.qpic.cn/test.jpg'),
+      wechatImageUrl(wechatPreviewCheck) === 'http://mmbiz.qpic.cn/test.jpg',
+      !article.outerHTML.includes('<script'),
+      !article.outerHTML.includes('<style')
+    ];
+    console.assert(checks.every(Boolean), '公众号正文结构检查失败');
+    if (!checks.every(Boolean)) statusText.textContent = '兼容结构需要检查';
+  </script>
+</body>
+</html>

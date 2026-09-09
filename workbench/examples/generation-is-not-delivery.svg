@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fbfdfc"/><stop offset="1" stop-color="#edf5f1"/></linearGradient>
+    <filter id="s2" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="9" stdDeviation="12" flood-color="#173c35" flood-opacity=".1"/></filter>
+    <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#2f8f78"/></marker>
+    <style>text{font-family:"PingFang SC","Hiragino Sans GB",sans-serif}.t{font-size:44px;font-weight:800}.k{font-size:18px;font-weight:700;letter-spacing:3px}.h{font-size:25px;font-weight:800}.b{font-size:19px;font-weight:500}.n{font-size:17px;font-weight:600}</style>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg2)"/>
+  <circle cx="86" cy="78" r="38" fill="#8b5cf6" opacity=".1"/><circle cx="1110" cy="90" r="56" fill="#d7a13d" opacity=".12"/>
+  <text x="600" y="64" text-anchor="middle" fill="#2f8f78" class="k">A REAL DELIVERY PIPELINE</text>
+  <text x="600" y="120" text-anchor="middle" fill="#173c35" class="t">生成，只是第一步</text>
+  <text x="600" y="158" text-anchor="middle" fill="#64736d" class="b">任何一环断掉，用户都拿不到真正的结果</text>
+
+  <g filter="url(#s2)">
+    <rect x="38" y="240" width="196" height="220" rx="24" fill="#f2ecff" stroke="#9b78d4" stroke-width="2"/>
+    <rect x="270" y="240" width="196" height="220" rx="24" fill="#edf7f4" stroke="#58a28d" stroke-width="2"/>
+    <rect x="502" y="240" width="196" height="220" rx="24" fill="#fff6e3" stroke="#d5a03e" stroke-width="2"/>
+    <rect x="734" y="240" width="196" height="220" rx="24" fill="#fff0f2" stroke="#cb6d7e" stroke-width="2"/>
+    <rect x="966" y="220" width="196" height="260" rx="28" fill="#e5f5ea" stroke="#237d58" stroke-width="3"/>
+  </g>
+
+  <g text-anchor="middle">
+    <circle cx="136" cy="290" r="26" fill="#8458dc"/><text x="136" y="299" fill="#fff" class="h">1</text>
+    <text x="136" y="350" fill="#5e3d92" class="h">AI 生成</text><text x="136" y="392" fill="#564966" class="b">文字 · 图片</text><text x="136" y="423" fill="#564966" class="b">视频 · 代码</text>
+
+    <circle cx="368" cy="290" r="26" fill="#2f8f78"/><text x="368" y="299" fill="#fff" class="h">2</text>
+    <text x="368" y="350" fill="#236c5b" class="h">格式适配</text><text x="368" y="392" fill="#435d55" class="b">排版清晰</text><text x="368" y="423" fill="#435d55" class="b">平台可读</text>
+
+    <circle cx="600" cy="290" r="26" fill="#d59c36"/><text x="600" y="299" fill="#fff" class="h">3</text>
+    <text x="600" y="350" fill="#996b20" class="h">资源上传</text><text x="600" y="392" fill="#67573b" class="b">图片 · 文件</text><text x="600" y="423" fill="#67573b" class="b">素材地址</text>
+
+    <circle cx="832" cy="290" r="26" fill="#cf6f80"/><text x="832" y="299" fill="#fff" class="h">4</text>
+    <text x="832" y="350" fill="#a64d60" class="h">平台交付</text><text x="832" y="392" fill="#684a50" class="b">草稿 · 下载</text><text x="832" y="423" fill="#684a50" class="b">发布入口</text>
+
+    <circle cx="1064" cy="280" r="28" fill="#1f7c56"/><text x="1064" y="289" fill="#fff" class="h">5</text>
+    <text x="1064" y="344" fill="#1f684a" class="h">真实验收</text><text x="1064" y="390" fill="#365c49" class="b">能打开 · 能用</text><text x="1064" y="423" fill="#365c49" class="b">愿意交付或发布</text>
+  </g>
+
+  <path d="M234 350H258" stroke="#2f8f78" stroke-width="4" marker-end="url(#a2)"/><path d="M466 350H490" stroke="#2f8f78" stroke-width="4" marker-end="url(#a2)"/><path d="M698 350H722" stroke="#2f8f78" stroke-width="4" marker-end="url(#a2)"/><path d="M930 350H954" stroke="#2f8f78" stroke-width="4" marker-end="url(#a2)"/>
+
+  <rect x="72" y="520" width="360" height="72" rx="36" fill="#fff" stroke="#d6dedb"/><text x="252" y="565" text-anchor="middle" fill="#7553a5" class="h">只停在生成 = Demo</text>
+  <rect x="768" y="520" width="360" height="72" rx="36" fill="#173c35"/><text x="948" y="565" text-anchor="middle" fill="#fff" class="h">走到验收 = 产品</text>
+  <path d="M432 556H756" stroke="#2f8f78" stroke-width="4" marker-end="url(#a2)"/>
+
+  <rect x="190" y="650" width="820" height="84" rx="42" fill="#f0f6f3" stroke="#b9d4cb" stroke-width="2"/>
+  <text x="600" y="686" text-anchor="middle" fill="#61706a" class="n">代码没有报错，不代表产品有价值</text>
+  <text x="600" y="718" text-anchor="middle" fill="#173c35" class="h">用户拿到结果，任务才算完成</text>
+</svg>

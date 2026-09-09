@@ -20,12 +20,13 @@ import urllib.parse
 from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent
+REPO_ROOT = SKILL_DIR.parent
 sys.path.insert(0, str(SKILL_DIR))
 sys.path.insert(0, str(SKILL_DIR / "toolkit"))
 
 
 def load_config():
-    for p in [SKILL_DIR / "config.yaml", Path.home() / ".config/wewrite/config.yaml"]:
+    for p in [REPO_ROOT / "config.yaml", SKILL_DIR / "config.yaml", Path.home() / ".config/wewrite/config.yaml"]:
         if p.exists():
             return yaml.safe_load(p.read_text()) or {}
     return {}

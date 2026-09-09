@@ -1,0 +1,21 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python3 -m pip install -r requirements.txt
+      - name: Check Python and workbench
+        run: |
+          python3 -m unittest discover -s workbench -p 'test_*.py'
+          python3 workbench/server.py self-test
+          python3 -m py_compile workbench/server.py toolkit/*.py
+          zsh -n workbench/打开公众号排版器.command
