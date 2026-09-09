@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>富文本粘贴自检</title>
+</head>
+<body style="margin:0;padding:32px;background:#eef3f0;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;">
+  <p id="result" style="color:#0b7a65;font-weight:700;">等待粘贴</p>
+  <div id="pasteTarget" contenteditable="true" style="min-height:320px;padding:24px;background:#fff;outline:1px solid #bad4cb;"></div>
+  <script>
+    const target = document.querySelector('#pasteTarget');
+    target.addEventListener('input', () => {
+      const styled = target.querySelectorAll('[style]').length;
+      const images = target.querySelectorAll('img').length;
+      document.querySelector('#result').textContent = `已粘贴：${styled} 个内联样式，${images} 张图片`;
+    });
+  </script>
+</body>
+</html>

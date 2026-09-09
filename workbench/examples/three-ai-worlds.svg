@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="bg4" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fbfdfc"/><stop offset="1" stop-color="#f0f4f2"/></linearGradient>
+    <filter id="s4" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="9" stdDeviation="12" flood-color="#173c35" flood-opacity=".1"/></filter>
+    <style>text{font-family:"PingFang SC","Hiragino Sans GB",sans-serif}.t{font-size:42px;font-weight:800}.k{font-size:18px;font-weight:700;letter-spacing:3px}.h{font-size:28px;font-weight:800}.b{font-size:21px;font-weight:600}.s{font-size:17px;font-weight:500}</style>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg4)"/>
+  <circle cx="82" cy="92" r="48" fill="#8b5cf6" opacity=".10"/><circle cx="1115" cy="85" r="52" fill="#d5a03e" opacity=".12"/>
+  <text x="600" y="62" text-anchor="middle" fill="#2f8f78" class="k">THREE DIFFERENT AI WORLDS</text>
+  <text x="600" y="116" text-anchor="middle" fill="#173c35" class="t">我们谈论的，可能不是同一个 AI</text>
+  <text x="600" y="154" text-anchor="middle" fill="#67746f" class="s">信息茧房不是无知，而是每个人每天看到的世界不同</text>
+
+  <g filter="url(#s4)">
+    <rect x="55" y="220" width="330" height="330" rx="42" fill="#f3edff" stroke="#9b78d4" stroke-width="2"/>
+    <rect x="435" y="220" width="330" height="330" rx="42" fill="#fff5e2" stroke="#d5a03e" stroke-width="2"/>
+    <rect x="815" y="200" width="330" height="370" rx="46" fill="#e7f6ec" stroke="#2f8f78" stroke-width="3"/>
+  </g>
+
+  <g text-anchor="middle">
+    <text x="220" y="278" fill="#7652a8" class="k">技术圈</text>
+    <text x="220" y="329" fill="#513b71" class="h">AI 是能力</text>
+    <text x="220" y="382" fill="#5e5268" class="b">模型 · 参数 · 框架</text>
+    <text x="220" y="424" fill="#5e5268" class="b">Agent · MCP · Skill</text>
+    <line x1="112" y1="463" x2="328" y2="463" stroke="#bca5df"/>
+    <text x="220" y="504" fill="#756a7b" class="s">容易停在技术先进</text>
+
+    <text x="600" y="278" fill="#b37c20" class="k">内容圈</text>
+    <text x="600" y="329" fill="#79581f" class="h">AI 是产量</text>
+    <text x="600" y="382" fill="#675b46" class="b">漫剧 · 数字人 · 热点</text>
+    <text x="600" y="424" fill="#675b46" class="b">流量 · 起号 · 批量</text>
+    <line x1="492" y1="463" x2="708" y2="463" stroke="#dfbf82"/>
+    <text x="600" y="504" fill="#7d735f" class="s">容易停在内容生成</text>
+
+    <text x="980" y="262" fill="#2f8f78" class="k">用户世界</text>
+    <text x="980" y="316" fill="#1f684a" class="h">AI 是结果</text>
+    <text x="980" y="372" fill="#395c4b" class="b">能省时间吗？</text>
+    <text x="980" y="416" fill="#395c4b" class="b">结果在哪里？</text>
+    <text x="980" y="460" fill="#395c4b" class="b">我能直接用吗？</text>
+    <line x1="872" y1="494" x2="1088" y2="494" stroke="#7fbaa2"/>
+    <text x="980" y="530" fill="#526f61" class="s">只关心问题有没有解决</text>
+  </g>
+
+  <path d="M220 550C270 630 390 650 510 650" fill="none" stroke="#9b78d4" stroke-width="3"/>
+  <path d="M600 550V635" fill="none" stroke="#d5a03e" stroke-width="3"/>
+  <path d="M980 570C920 630 810 650 690 650" fill="none" stroke="#2f8f78" stroke-width="4"/>
+  <rect x="175" y="632" width="850" height="105" rx="52" fill="#173c35"/>
+  <text x="600" y="676" text-anchor="middle" fill="#bce5d8" class="s">真正能用的 AI 产品</text>
+  <text x="600" y="715" text-anchor="middle" fill="#fff" class="h">技术能力 × 内容价值 × 用户结果</text>
+</svg>

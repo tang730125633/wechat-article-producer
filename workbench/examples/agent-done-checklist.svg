@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="bg3" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fbfdfc"/><stop offset="1" stop-color="#eef4f1"/></linearGradient>
+    <filter id="s3" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="11" flood-color="#173c35" flood-opacity=".09"/></filter>
+    <style>text{font-family:"PingFang SC","Hiragino Sans GB",sans-serif}.t{font-size:44px;font-weight:800}.k{font-size:18px;font-weight:700;letter-spacing:3px}.h{font-size:24px;font-weight:800}.b{font-size:19px;font-weight:500}.big{font-size:30px;font-weight:800}</style>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg3)"/>
+  <path d="M0 126C250 64 420 156 650 104S980 76 1200 126" fill="none" stroke="#8b5cf6" stroke-width="2" opacity=".13"/>
+  <text x="600" y="64" text-anchor="middle" fill="#8b5cf6" class="k">BEFORE AN AGENT SAYS “DONE”</text>
+  <text x="600" y="119" text-anchor="middle" fill="#173c35" class="t">Agent 说“完成”之前</text>
+
+  <g filter="url(#s3)">
+    <rect x="100" y="180" width="650" height="86" rx="20" fill="#fff" stroke="#d3e2dc"/>
+    <rect x="100" y="282" width="650" height="86" rx="20" fill="#fff" stroke="#d3e2dc"/>
+    <rect x="100" y="384" width="650" height="86" rx="20" fill="#fff" stroke="#d3e2dc"/>
+    <rect x="100" y="486" width="650" height="86" rx="20" fill="#fff" stroke="#d3e2dc"/>
+    <rect x="100" y="588" width="650" height="86" rx="20" fill="#e8f6ed" stroke="#2f8f78" stroke-width="2"/>
+  </g>
+
+  <g text-anchor="middle" class="h">
+    <circle cx="150" cy="223" r="26" fill="#8458dc"/><text x="150" y="231" fill="#fff">1</text>
+    <circle cx="150" cy="325" r="26" fill="#5275d2"/><text x="150" y="333" fill="#fff">2</text>
+    <circle cx="150" cy="427" r="26" fill="#2f8f78"/><text x="150" y="435" fill="#fff">3</text>
+    <circle cx="150" cy="529" r="26" fill="#d29b42"/><text x="150" y="537" fill="#fff">4</text>
+    <circle cx="150" cy="631" r="26" fill="#1f7c56"/><text x="150" y="639" fill="#fff">5</text>
+  </g>
+  <g>
+    <text x="205" y="216" fill="#44325d" class="h">理解目标</text><text x="205" y="246" fill="#69736f" class="b">知道用户真正要什么，而不是只匹配关键词</text>
+    <text x="205" y="318" fill="#334f91" class="h">选择工具并执行</text><text x="205" y="348" fill="#69736f" class="b">真的调用 Skill、MCP、接口或本地工具</text>
+    <text x="205" y="420" fill="#236c5b" class="h">处理异常</text><text x="205" y="450" fill="#69736f" class="b">失败说清原因，能恢复就继续推进</text>
+    <text x="205" y="522" fill="#93691f" class="h">交付产物</text><text x="205" y="552" fill="#69736f" class="b">文件、链接、草稿或成片必须真实存在</text>
+    <text x="205" y="624" fill="#1f684a" class="h">完成验收</text><text x="205" y="654" fill="#526a5e" class="b">用户能打开、能使用，并确认结果符合目标</text>
+  </g>
+
+  <g filter="url(#s3)">
+    <rect x="810" y="212" width="290" height="180" rx="26" fill="#fff1f3" stroke="#cf6f80" stroke-width="2"/>
+    <rect x="810" y="438" width="290" height="180" rx="26" fill="#173c35"/>
+  </g>
+  <text x="955" y="260" text-anchor="middle" fill="#a64d60" class="k">不算完成</text>
+  <text x="955" y="310" text-anchor="middle" fill="#723844" class="big">“正在处理”</text>
+  <text x="955" y="350" text-anchor="middle" fill="#805b63" class="b">没有动作 · 没有结果</text>
+  <text x="955" y="485" text-anchor="middle" fill="#bce5d8" class="k">真正完成</text>
+  <text x="955" y="536" text-anchor="middle" fill="#fff" class="big">能执行 · 能交付</text>
+  <text x="955" y="578" text-anchor="middle" fill="#dceee8" class="big">能验收</text>
+
+  <text x="600" y="742" text-anchor="middle" fill="#173c35" class="h">最后一公里，才是 Agent 与普通聊天机器人的分界线</text>
+</svg>
