@@ -1,5 +1,7 @@
 # wechat-article-producer
 
+![Zel 和橘猫一起把语音与手写想法送入排版工作台，最终生成公众号文章](assets/readme/hero-zel-v1.webp)
+
 把真实想法整理成文章，完成排版和配图，再交付到微信公众号。
 
 项目现在提供两条互不冲突的路径：
