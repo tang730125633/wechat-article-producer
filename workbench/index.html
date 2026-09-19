@@ -373,6 +373,7 @@
     const wechatStatus = document.querySelector('#wechatStatus');
     const draftKey = 'tang-wechat-layout-draft-v1';
     const imageAssets = new Map();
+    const isPublicHost = !['127.0.0.1', 'localhost'].includes(location.hostname);
     let activeTheme = 'editorial';
     let selectedImageSlot = 0;
 
@@ -817,6 +818,7 @@
     }
 
     async function uploadSlotToWechat(section, button) {
+      if (isPublicHost) return showToast('线上版不上传微信。请复制源码后在公众号里插图，或用本机排版器上传。');
       const image = section.querySelector('img');
       if (!image) return showToast('请先粘贴或选择一张图片');
       if (!confirm('将这张图片上传到当前配置的微信公众号？')) return;
@@ -881,10 +883,14 @@
 
     imageFileInput.addEventListener('change', () => putImageInSlot(imageFileInput.files[0], selectedImageSlot));
 
-    fetch('/api/wechat/status')
-      .then(response => response.json())
-      .then(result => { wechatStatus.textContent = `微信图片接口：${result.configured ? '已配置，可以上传' : '未配置，请先运行 python3 server.py configure'}`; })
-      .catch(() => { wechatStatus.textContent = '微信图片接口：服务未启动'; });
+    if (isPublicHost) {
+      wechatStatus.textContent = '线上版：排版、预览、复制可用。上传微信请用本机排版器。';
+    } else {
+      fetch('/api/wechat/status')
+        .then(response => response.json())
+        .then(result => { wechatStatus.textContent = `微信图片接口：${result.configured ? '已配置，可以上传' : '未配置，请先运行 python3 server.py configure'}`; })
+        .catch(() => { wechatStatus.textContent = '微信图片接口：服务未启动'; });
+    }
 
     document.querySelector('#renderButton').addEventListener('click', () => renderEditorArticle());
     markdownInput.addEventListener('keydown', event => {
