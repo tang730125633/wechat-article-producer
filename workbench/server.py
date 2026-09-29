@@ -17,7 +17,9 @@ import urllib.request
 import webbrowser
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from html.parser import HTMLParser
 from pathlib import Path
+from threading import Lock
 
 
 ROOT = Path(__file__).resolve().parent
@@ -26,6 +28,8 @@ PORT = int(os.environ.get("WECHAT_WORKBENCH_PORT", "8766"))
 APP_ID = "wechat-article-producer-workbench-v2"
 KEYCHAIN_SERVICE = "Tang WeChat Publisher"
 TOKEN_CACHE = {"value": "", "expires_at": 0.0, "credentials": b""}
+DRAFT_RECEIPTS = {}
+DRAFT_LOCK = Lock()
 
 
 class WeChatError(Exception):
@@ -77,10 +81,12 @@ def api_json(url, data=None, headers=None):
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
         raise WeChatError(f"微信接口连接失败：{error}") from error
     if result.get("errcode"):
+        rejected_ip = re.search(r"invalid ip ([0-9.]+)", result.get("errmsg", ""))
         simple_errors = {
             40013: "公众号 AppID 不正确",
             40125: "公众号 AppSecret 不正确",
-            40164: "当前网络 IP 没有加入公众号 IP 白名单",
+            40164: f"请将当前网络 IP {rejected_ip.group(1) if rejected_ip else ''} 添加到公众号 IP 白名单，并保留原有条目",
+            48001: "当前公众号没有开通此接口权限",
         }
         message = simple_errors.get(result["errcode"], result.get("errmsg", "未知错误"))
         raise WeChatError(f"微信接口错误 {result['errcode']}：{message}", result["errcode"])
@@ -153,6 +159,66 @@ def upload_image(data_url):
     return result["url"]
 
 
+def wechat_request(path, data, content_type="application/json; charset=utf-8"):
+    for attempt in range(2):
+        token = urllib.parse.quote(access_token(force=bool(attempt)), safe="")
+        try:
+            return api_json(f"https://api.weixin.qq.com/cgi-bin/{path}{'&' if '?' in path else '?'}access_token={token}", data, {"Content-Type": content_type})
+        except WeChatError as error:
+            # Only an explicit token rejection is safe to retry, never a timeout.
+            if attempt or error.errcode not in {40001, 40014, 42001}:
+                raise
+
+
+class DraftImages(HTMLParser):
+    def handle_starttag(self, tag, attrs):
+        if tag == "img":
+            source = urllib.parse.urlparse(dict(attrs).get("src", ""))
+            if source.scheme not in {"http", "https"} or source.hostname not in {"mmbiz.qpic.cn", "mmbiz.qlogo.cn"}:
+                raise WeChatError("请先将正文图片上传到微信，再导入草稿")
+
+
+def create_draft(body):
+    article = {}
+    for key, label in (("title", "标题"), ("author", "作者"), ("digest", "摘要"), ("content", "正文")):
+        value = body.get(key, "")
+        if not isinstance(value, str):
+            raise WeChatError(f"{label}格式错误")
+        article[key] = value.strip()
+    if not article["title"] or not article["content"]:
+        raise WeChatError("请填写标题和正文")
+    DraftImages().feed(article["content"])
+    mime, filename, image = decode_image(body.get("cover_data_url"))
+    fingerprint = hashlib.sha256(json.dumps(article, ensure_ascii=False, sort_keys=True).encode() + image + keychain_get("appid").encode()).hexdigest()
+    # ponytail: one local user's imports are serialized; receipts last until restart.
+    with DRAFT_LOCK:
+        if fingerprint in DRAFT_RECEIPTS:
+            return {**DRAFT_RECEIPTS[fingerprint], "reused": True}
+        boundary, upload = multipart_image(mime, filename, image)
+        cover = wechat_request("material/add_material?type=image", upload, f"multipart/form-data; boundary={boundary}")
+        if not cover.get("media_id"):
+            raise WeChatError("微信未返回永久封面素材，请稍后检查素材库")
+        article["thumb_media_id"] = cover["media_id"]
+        article.update(need_open_comment=0, only_fans_can_comment=0)
+        try:
+            result = wechat_request("draft/add", json.dumps({"articles": [article]}, ensure_ascii=False).encode())
+        except WeChatError as error:
+            if error.errcode is None:
+                raise WeChatError("未收到草稿创建回执，结果暂不确定。请先查看公众号草稿箱，勿立即重复导入。") from error
+            raise
+        if not result.get("media_id"):
+            raise WeChatError("微信未返回草稿编号，请先检查草稿箱，勿重复导入")
+        receipt = {"media_id": result["media_id"], "title": article["title"], "verified": False}
+        DRAFT_RECEIPTS[fingerprint] = receipt
+        try:
+            saved = wechat_request("draft/get", json.dumps({"media_id": result["media_id"]}).encode())
+            item = saved.get("news_item", [{}])[0]
+            receipt["verified"] = item.get("title") == article["title"] and item.get("content") == article["content"] and item.get("thumb_media_id") == article["thumb_media_id"]
+        except (WeChatError, IndexError):
+            pass  # Creation succeeded; readback failure must never create another draft.
+        return receipt
+
+
 def allowed_origin(origin):
     return not origin or origin in {f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}"}
 
@@ -176,7 +242,7 @@ class Handler(SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def do_POST(self):
-        if self.path != "/api/wechat/upload-image":
+        if self.path not in {"/api/wechat/upload-image", "/api/wechat/draft"}:
             return self.send_json(404, {"error": "接口不存在"})
         if self.headers.get("Content-Type", "").split(";", 1)[0] != "application/json":
             return self.send_json(415, {"error": "请求格式错误"})
@@ -186,14 +252,17 @@ class Handler(SimpleHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
             return self.send_json(400, {"error": "请求长度错误"})
-        if not 0 < length < 1_500_000:
-            return self.send_json(413, {"error": "图片请求过大"})
+        if not 0 < length < 3_000_000:
+            return self.send_json(413, {"error": "请求过大，请缩小图片或正文后重试"})
         try:
             body = json.loads(self.rfile.read(length))
             if not isinstance(body, dict):
                 raise WeChatError("请求格式错误")
-            url = upload_image(body.get("data_url", ""))
-            self.send_json(200, {"url": url})
+            if self.path == "/api/wechat/draft":
+                self.send_json(200, create_draft(body))
+            else:
+                url = upload_image(body.get("data_url", ""))
+                self.send_json(200, {"url": url})
         except (json.JSONDecodeError, WeChatError) as error:
             self.send_json(400, {"error": str(error)})
 

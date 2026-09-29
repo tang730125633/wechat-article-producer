@@ -104,6 +104,35 @@ class ServerTests(unittest.TestCase):
         server.configure()
         self.assertEqual(keychain_set.call_args_list, [mock.call("appid", "new-appid"), mock.call("appsecret", "new-secret")])
 
+    @mock.patch("server.keychain_get", return_value="draft-test-account")
+    @mock.patch("server.wechat_request")
+    def test_draft_uses_permanent_cover_and_reuses_receipt(self, request, _keychain):
+        server.DRAFT_RECEIPTS.clear()
+        body = dict(title="掌控感", author="唐泽龙", digest="生活随笔", content="<p>保留我的犹豫</p>", cover_data_url=self.data_url("image/png", b"\x89PNG\r\n\x1a\nTEST"))
+        request.side_effect = [{"media_id": "permanent-cover"}, {"media_id": "draft-1"}, {"news_item": [{"title": body["title"], "content": body["content"], "thumb_media_id": "permanent-cover"}]}]
+        self.assertTrue(server.create_draft(body)["verified"])
+        self.assertTrue(server.create_draft(body)["reused"])
+        self.assertEqual(request.call_count, 3)
+        self.assertEqual(request.call_args_list[0].args[0], "material/add_material?type=image")
+        payload = server.json.loads(request.call_args_list[1].args[1])
+        self.assertEqual(payload["articles"][0]["thumb_media_id"], "permanent-cover")
+
+    @mock.patch("server.keychain_get", return_value="draft-test-account")
+    @mock.patch("server.wechat_request")
+    def test_readback_failure_keeps_created_draft_receipt(self, request, _keychain):
+        server.DRAFT_RECEIPTS.clear()
+        body = dict(title="候选稿", content="<p>文字</p>", cover_data_url=self.data_url("image/png", b"\x89PNG\r\n\x1a\nTEST"))
+        request.side_effect = [{"media_id": "cover"}, {"media_id": "draft"}, server.WeChatError("timeout")]
+        self.assertFalse(server.create_draft(body)["verified"])
+        self.assertEqual(server.create_draft(body)["media_id"], "draft")
+        self.assertEqual(request.call_count, 3)
+
+    @mock.patch("server.wechat_request")
+    def test_draft_does_not_silently_lose_unuploaded_images(self, request):
+        with self.assertRaisesRegex(server.WeChatError, "正文图片"):
+            server.create_draft({"title": "图文", "content": '<img src="data:image/png;base64,AA==">'})
+        request.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

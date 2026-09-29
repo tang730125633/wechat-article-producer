@@ -253,6 +253,20 @@
         <button class="action secondary" id="copyButton" type="button">复制公众号富文本</button>
         <button class="action secondary" id="downloadButton" type="button">下载 HTML</button>
       </div>
+      <section class="composer" aria-label="导入公众号草稿">
+        <p class="theme-title">4. 导入公众号草稿</p>
+        <div id="draftFields">
+          <label class="field-label" for="draftAuthor">公众号作者（不含日期）</label>
+          <input class="field" id="draftAuthor" placeholder="唐泽龙">
+          <label class="field-label" for="draftDigest">摘要（可选）</label>
+          <textarea class="editor" id="draftDigest" style="min-height:80px" placeholder="一句话介绍这篇文章"></textarea>
+          <label class="field-label" for="draftCover">封面图片（JPG / PNG，小于 1 MB）</label>
+          <input id="draftCover" type="file" accept="image/jpeg,image/png">
+          <img id="draftCoverPreview" alt="待导入的封面预览" hidden style="width:100%;margin:10px 0;">
+        </div>
+        <p class="composer-note" id="draftResult" role="status" aria-live="polite">保存为草稿，不会群发或正式发布。</p>
+        <button class="action" id="draftButton" type="button">导入公众号草稿</button>
+      </section>
       <ul class="meta">
         <li>正文：16px / 1.9 行距</li>
         <li>主色：墨绿；紫色仅作标记</li>
@@ -729,7 +743,9 @@
         title: titleInput.value,
         byline: bylineInput.value,
         markdown: markdownInput.value,
-        theme: activeTheme
+        theme: activeTheme,
+        author: document.querySelector('#draftAuthor').value,
+        digest: document.querySelector('#draftDigest').value
       }));
     }
 
@@ -1055,6 +1071,96 @@
       }
     });
 
+    const draftButton = document.querySelector('#draftButton');
+    const draftResult = document.querySelector('#draftResult');
+    const draftCover = document.querySelector('#draftCover');
+    let coverDataUrl = '';
+    let importBusy = false;
+    function fileDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('图片读取失败，请重新选择'));
+        reader.readAsDataURL(file);
+      });
+    }
+    draftCover.addEventListener('change', async () => {
+      coverDataUrl = '';
+      const preview = document.querySelector('#draftCoverPreview');
+      preview.hidden = true;
+      const file = draftCover.files[0];
+      if (!file) return;
+      if (!['image/png', 'image/jpeg'].includes(file.type) || file.size >= 1024 * 1024) {
+        draftResult.textContent = '请选择小于 1 MB 的 JPG 或 PNG 封面';
+        draftCover.value = '';
+        return;
+      }
+      try {
+        coverDataUrl = await fileDataUrl(file);
+        preview.src = coverDataUrl;
+        preview.hidden = false;
+        draftResult.textContent = '封面已就绪，导入只会保存为草稿。';
+      } catch (error) { draftResult.textContent = error.message; }
+    });
+    document.querySelectorAll('#draftAuthor, #draftDigest').forEach(input => input.addEventListener('input', saveEditorState));
+    if (isPublicHost) {
+      document.querySelector('#draftFields').hidden = true;
+      draftButton.textContent = '打开本机导入草稿';
+      draftResult.textContent = '带上当前文字和主题到本机工作台，公众号凭据留在你的电脑。先启动项目中的“打开公众号排版器”。';
+    }
+    async function postWechat(path, body) {
+      const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || '微信请求失败');
+      return result;
+    }
+    draftButton.addEventListener('click', async () => {
+      if (importBusy) return;
+      if (isPublicHost) {
+        if (article.querySelector('img') || imageAssets.size) {
+          draftResult.textContent = '当前有正文图片，请在本机工作台继续编辑并添加图片；本次不会丢弃图片转移。';
+          return;
+        }
+        saveEditorState();
+        window.open('http://127.0.0.1:8767/#import=' + encodeURIComponent(localStorage.getItem(draftKey)), '_blank', 'noopener');
+        return;
+      }
+      if (!titleInput.value.trim() || !markdownInput.value.trim()) { draftResult.textContent = '请先填写标题和正文'; return; }
+      if (!coverDataUrl) { draftResult.textContent = '请先选择封面图片'; draftCover.focus(); return; }
+      importBusy = true;
+      draftButton.disabled = true;
+      draftResult.textContent = '正在准备正文和封面…';
+      let creatingDraft = false;
+      try {
+        renderEditorArticle(false);
+        if (article.querySelector('.image-slot')) throw new Error('正文还有空图片位，请添加图片或删去空图片位');
+        const values = { title: titleInput.value.trim(), author: document.querySelector('#draftAuthor').value.trim(), digest: document.querySelector('#draftDigest').value.trim(), cover_data_url: coverDataUrl };
+        const clone = await cloneWithInlineImages();
+        for (const image of clone.querySelectorAll('img')) {
+          if (!wechatImageUrl(image)) {
+            const uploaded = await postWechat('/api/wechat/upload-image', { data_url: image.src });
+            image.src = uploaded.url;
+          }
+        }
+        draftResult.textContent = '正在保存到公众号草稿箱…';
+        creatingDraft = true;
+        const result = await postWechat('/api/wechat/draft', {
+          ...values, content: clone.outerHTML
+        });
+        draftResult.textContent = result.verified ? '已保存并读回核对。请到公众号草稿箱查看；尚未发布。' : '微信已确认草稿创建，暂未完成读回核对。请到草稿箱查看，勿重复导入。';
+        draftButton.textContent = '已导入草稿';
+      } catch (error) {
+        draftResult.textContent = error instanceof TypeError && creatingDraft ? '连接中断，草稿结果暂不确定。请先查看草稿箱，勿立即重复导入。' : error.message;
+        draftButton.disabled = creatingDraft && (error instanceof TypeError || error.message.includes('勿'));
+      } finally { importBusy = false; }
+    });
+    [titleInput, bylineInput, markdownInput, draftCover, document.querySelector('#draftAuthor'), document.querySelector('#draftDigest')].forEach(input => input.addEventListener('input', () => {
+      if (!importBusy && draftButton.textContent === '已导入草稿') { draftButton.disabled = false; draftButton.textContent = '导入公众号草稿'; }
+    }));
+    document.querySelectorAll('[data-theme]').forEach(button => button.addEventListener('click', () => {
+      if (!importBusy && draftButton.textContent === '已导入草稿') { draftButton.disabled = false; draftButton.textContent = '导入公众号草稿'; }
+    }));
+
     try {
       const savedDraft = JSON.parse(localStorage.getItem(draftKey) || 'null');
       if (savedDraft) {
@@ -1062,11 +1168,28 @@
         bylineInput.value = savedDraft.byline || bylineInput.value;
         markdownInput.value = savedDraft.markdown || '';
         activeTheme = themes[savedDraft.theme] ? savedDraft.theme : activeTheme;
+        document.querySelector('#draftAuthor').value = savedDraft.author || '';
+        document.querySelector('#draftDigest').value = savedDraft.digest || '';
       }
     } catch (error) {
       console.warn('本地草稿无法读取，已使用默认内容', error);
     }
 
+    if (!isPublicHost && location.hash.startsWith('#import=')) {
+      try {
+        const incoming = JSON.parse(decodeURIComponent(location.hash.slice(8)));
+        if (typeof incoming.markdown !== 'string' || typeof incoming.title !== 'string') throw new Error('文章格式错误');
+        if (!markdownInput.value || confirm('将带入的文章显示在本机工作台？现有文字会先备份在本机浏览器中。')) {
+          localStorage.setItem(draftKey + '-before-import', localStorage.getItem(draftKey) || 'null');
+          titleInput.value = incoming.title; bylineInput.value = incoming.byline || '';
+          markdownInput.value = incoming.markdown; activeTheme = themes[incoming.theme] ? incoming.theme : activeTheme;
+          document.querySelector('#draftAuthor').value = incoming.author || '';
+          document.querySelector('#draftDigest').value = incoming.digest || '';
+          saveEditorState();
+        }
+        history.replaceState(null, '', location.pathname + location.search);
+      } catch (error) { draftResult.textContent = '带入失败：' + error.message; }
+    }
     if (!renderEditorArticle(false)) applyTheme(activeTheme);
 
     const parserCheck = document.createElement('div');
