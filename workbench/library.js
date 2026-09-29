@@ -140,16 +140,17 @@
   async function openArticle(id) {
     if (dirty) await save();
     const item = await request('/api/articles?id=' + encodeURIComponent(id));
-    applyDocument(item); await historyList();
+    applyDocument(item);
     history.replaceState(null, '', location.pathname + '?article=' + encodeURIComponent(id));
+    await historyList();
   }
 
   async function create(document) {
     if (!signedIn) throw new Error('请先登录自己的文章工作台');
     if (dirty) await save();
     applyDocument({id:crypto.randomUUID(), revision:0, archived:false, document:document || {title:'未命名文章', markdown:'', theme:activeTheme, author:'唐泽龙', byline:'唐泽龙'}});
-    dirty = true; generation++; await save('新建文章');
     history.replaceState(null, '', location.pathname + '?article=' + encodeURIComponent(current.id));
+    dirty = true; generation++; await save('新建文章');
   }
 
   $('#newArticle').addEventListener('click', () => create().catch(showError));

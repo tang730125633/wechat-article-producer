@@ -1133,10 +1133,7 @@
       });
     }
     draftCover.addEventListener('change', async () => {
-      coverDataUrl = '';
       const preview = document.querySelector('#draftCoverPreview');
-      preview.hidden = true;
-      updateCoverPreview();
       const file = draftCover.files[0];
       if (!file) return;
       if (!['image/png', 'image/jpeg'].includes(file.type) || file.size >= 1024 * 1024) {

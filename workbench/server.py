@@ -193,6 +193,16 @@ class Markup(HTMLParser):
         self.parts = []
 
     def handle_starttag(self, tag, attrs):
+        if tag == "img":
+            attrs = dict(attrs)
+            source = attrs.pop("data-src", None) or attrs.get("src", "")
+            parsed = urllib.parse.urlparse(source)
+            # WeChat changes src to data-src and selects a display size for the same asset.
+            parent, _, size = parsed.path.rpartition("/")
+            if parsed.hostname == "mmbiz.qpic.cn" and parent.startswith("/mmbiz") and size.isdigit():
+                source = "https://mmbiz.qpic.cn" + parent
+            attrs["src"] = source
+            attrs = list(attrs.items())
         self.parts.append(("start", tag, sorted(attrs)))
 
     def handle_endtag(self, tag):

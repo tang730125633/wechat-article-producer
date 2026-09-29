@@ -166,6 +166,8 @@ class ServerTests(unittest.TestCase):
         self.assertTrue(server.same_html(original, original.replace("'", "&#39;")))
         self.assertFalse(server.same_html(original, original.replace("还没", "已经")))
         self.assertFalse(server.same_html('<p>&lt;b&gt;文字&lt;/b&gt;</p>', '<p><b>文字</b></p>'))
+        self.assertTrue(server.same_html('<img src="http://mmbiz.qpic.cn/mmbiz_png/asset1/0?wx_fmt=png">', '<img data-src="https://mmbiz.qpic.cn/mmbiz_png/asset1/640?from=appmsg">'))
+        self.assertFalse(server.same_html('<img src="https://mmbiz.qpic.cn/mmbiz_png/asset1/0">', '<img data-src="https://mmbiz.qpic.cn/mmbiz_png/asset2/640">'))
 
 
 if __name__ == "__main__":
