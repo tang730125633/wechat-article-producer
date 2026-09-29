@@ -215,7 +215,7 @@
   </header>
   <section id="libraryPage" class="library-page" hidden>
     <div class="library-heading"><div><h1>我的文章</h1><p>AI 帮你整理与制作，你在这里审阅、微调和确认。</p></div><button id="newArticle" type="button">＋ 新建文章</button></div>
-    <form id="ownerLogin" hidden><p>这是私人的文章库。请让你的 AI 获取本次登录码，再在这里登录。</p><label for="loginCode">一次性登录码</label><input id="loginCode" type="password" autocomplete="off"><button type="submit">登录工作台</button></form>
+    <form id="ownerLogin" hidden><p>输入工作台密码，即可继续查看和编辑自己的文章。</p><label for="loginCode">登录密码</label><input id="loginCode" type="password" autocomplete="current-password"><button type="submit">登录工作台</button></form>
     <div class="library-filters"><input id="articleSearch" placeholder="搜索文章标题" aria-label="搜索文章标题"><select id="articleFilter" aria-label="筛选文章"><option value="active">工作台草稿</option><option value="wechat">已送微信</option><option value="archived">已归档</option><option value="all">全部文章</option></select><button id="refreshLibrary" type="button">刷新</button></div>
     <p id="libraryMessage" role="status"></p><div id="articleList" class="article-list"></div>
     <button id="recoverBrowserDraft" type="button" hidden>另存当前浏览器里的旧稿</button>

@@ -5,6 +5,7 @@ import os
 import secrets
 import sqlite3
 import time
+import tempfile
 import uuid
 from pathlib import Path
 
@@ -57,13 +58,35 @@ def login_code():
     return code
 
 
+def set_password(password):
+    if not isinstance(password, str) or not password:
+        raise ValueError("密码不能为空")
+    connect().close()
+    salt = secrets.token_bytes(16)
+    value = {"salt": salt.hex(), "hash": hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 600000).hex()}
+    with tempfile.NamedTemporaryFile(mode="w", dir=DATA, delete=False) as out:
+        json.dump(value, out)
+        path = out.name
+    os.replace(path, DATA / "password.json")
+
+
+def password_matches(password):
+    try:
+        value = json.loads((DATA / "password.json").read_text())
+        actual = hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(value["salt"]), 600000).hex()
+        return secrets.compare_digest(actual, value["hash"])
+    except (OSError, ValueError, KeyError):
+        return False
+
+
 def login(code):
     if not isinstance(code, str):
         return None
+    valid_password = password_matches(code)
     with connect() as db:
         db.execute("BEGIN IMMEDIATE")
         result = db.execute("DELETE FROM login_codes WHERE digest=? AND expires>?", (digest(code), time.time()))
-        if result.rowcount != 1:
+        if result.rowcount != 1 and not valid_password:
             return None
         token = secrets.token_urlsafe(40)
         db.execute("DELETE FROM sessions WHERE expires < ?", (time.time(),))

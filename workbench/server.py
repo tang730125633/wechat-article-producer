@@ -350,7 +350,7 @@ class Handler(SimpleHTTPRequestHandler):
                 raise WeChatError("请求格式错误")
             if self.path == "/api/session":
                 token = library.login(body.get("code", ""))
-                return self.send_json(200 if token else 401, {"ok": bool(token), "error": "" if token else "登录码已失效，请重新获取"}, cookie=token)
+                return self.send_json(200 if token else 401, {"ok": bool(token), "error": "" if token else "密码不正确，或一次性登录码已失效"}, cookie=token)
             if self.path == "/api/articles":
                 return self.send_json(200, library.save_article(body))
             if self.path == "/api/wechat/draft":

@@ -168,6 +168,15 @@ class ServerTests(unittest.TestCase):
         self.assertIsNone(lib.login(code))
         self.assertFalse(lib.authorized("invalid", "invalid"))
 
+    def test_fixed_password_remains_valid_without_plaintext_storage(self):
+        lib = server.library
+        lib.set_password("owner-test-passphrase")
+        self.assertNotIn("owner-test-passphrase", (lib.DATA / "password.json").read_text())
+        self.assertIsNone(lib.login("wrong-password"))
+        for _ in range(2):
+            token = lib.login("owner-test-passphrase")
+            self.assertTrue(lib.authorized("", token))
+
     def test_readback_accepts_entity_escaping_but_not_changed_text_or_markup(self):
         original = '<p style="font-family:\'PingFang SC\'">我还没想明白 &amp; 保留犹豫</p>'
         self.assertTrue(server.same_html(original, original.replace("'", "&#39;")))
