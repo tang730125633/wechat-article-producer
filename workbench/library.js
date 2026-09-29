@@ -87,10 +87,11 @@
     coverDataUrl = doc.cover || ''; draftCover.value = '';
     $('#draftCoverPreview').src = coverDataUrl; $('#draftCoverPreview').hidden = !coverDataUrl;
     imageAssets.clear(); for (const [key,value] of Object.entries(doc.images || {})) imageAssets.set(key,value);
-    draftButton.disabled = false; draftButton.textContent = '导入公众号草稿';
+    draftButton.disabled = false; draftButton.textContent = '送到微信草稿箱';
     draftResult.textContent = doc.wechat ? '这篇文章曾送入微信草稿箱，后续修改不会自动更新微信。' : '保存为微信草稿，不会群发或正式发布。';
     if (!renderEditorArticle(false)) { article.innerHTML = ''; $('#previewTitle').textContent = doc.title || '未命名文章'; $('#previewByline').textContent = doc.byline || ''; }
     saveEditorState();
+    updateCoverPreview();
     loading = false;
     localStorage.setItem('tang-active-article', item.id);
     status.textContent = item.revision ? '已从网站载入' : '新文章尚未保存';

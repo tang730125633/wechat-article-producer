@@ -4,7 +4,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tang 公众号排版工作台</title>
-  <link rel="stylesheet" href="library.css">
   <style>
     :root {
       color-scheme: light;
@@ -205,6 +204,7 @@
       .phone-top { display: none; }
     }
   </style>
+  <link rel="stylesheet" href="library.css">
 </head>
 <body>
   <header class="worktop">
@@ -220,36 +220,38 @@
     <p id="libraryMessage" role="status"></p><div id="articleList" class="article-list"></div>
     <button id="recoverBrowserDraft" type="button" hidden>另存当前浏览器里的旧稿</button>
   </section>
-  <div id="articleTools" class="article-tools" hidden><span id="articleVersion"></span><select id="versionSelect" aria-label="历史版本"><option value="">历史版本</option></select><button id="restoreVersion" type="button">恢复所选版本</button><button id="archiveArticle" type="button">归档文章</button><button id="copyForPolish" type="button">复制正文给润色对话</button></div>
+  <div id="articleTools" class="article-tools" hidden><span id="articleVersion"></span><details class="more-tools"><summary>历史与更多</summary><div class="more-tools-body"><select id="versionSelect" aria-label="历史版本"><option value="">历史版本</option></select><button id="restoreVersion" type="button">恢复所选版本</button><button id="archiveArticle" type="button">归档文章</button><button id="copyForPolish" type="button">复制正文给润色对话</button></div></details></div>
   <main class="shell">
     <aside class="panel">
-      <p class="eyebrow">TANG EDITORIAL · V2</p>
-      <h1>公众号排版工作台</h1>
-      <p class="intro">AI 整理与润色，你在右侧审阅。可以直接微调文字和样式，确认后送入微信草稿箱。</p>
+      <p class="eyebrow">EDIT & REVIEW</p>
+      <h1>把文章准备好</h1>
+      <p class="intro">先看右侧预览。想改哪里，在左侧微调；准备好了，再送到微信草稿箱。</p>
       <p class="status"><span class="dot" aria-hidden="true"></span><span id="statusText">正在检查兼容性…</span></p>
       <section class="composer" aria-label="文章输入区">
-        <p class="theme-title">1. 正文与微调</p>
+        <h2 class="step-title"><span>1</span> 微调内容</h2>
         <label class="field-label" for="titleInput">文章标题</label>
         <input class="field" id="titleInput" value="我想用 AI，把创作这件事坚持下来">
         <label class="field-label" for="bylineInput">作者与日期</label>
         <input class="field" id="bylineInput" value="唐泽龙　2026年9月">
-        <label class="field-label" for="markdownInput">正文（支持 Markdown 或普通分段文字）</label>
-        <textarea class="editor" id="markdownInput" placeholder="把新文章直接粘贴到这里。空行会分段；## 是小标题；> 是引用；**文字** 会加粗。"></textarea>
-        <p class="theme-title">2. 插入小组件</p>
-        <div class="component-grid" aria-label="文章组件">
+        <label class="field-label" for="markdownInput">正文</label>
+        <textarea class="editor" id="markdownInput" placeholder="AI 整理的正文会出现在这里，你也可以直接修改。"></textarea>
+        <p class="field-label">在光标位置添加</p>
+        <div class="component-grid" aria-label="正文工具">
           <button class="component-button" type="button" data-component="heading">小标题</button>
           <button class="component-button" type="button" data-component="quote">引用</button>
-          <button class="component-button" type="button" data-component="highlight">金句卡</button>
-          <button class="component-button" type="button" data-component="flow">流程卡</button>
-          <button class="component-button" type="button" data-component="image">图片位</button>
-          <button class="component-button" type="button" data-component="divider">分隔符</button>
-          <button class="component-button" type="button" data-component="footer">结尾签名</button>
+          <button class="component-button" type="button" id="insertBodyImage">插入图片</button>
+          <button class="component-button" type="button" data-component="divider">分隔线</button>
+          <details class="more-components"><summary>更多</summary><div>
+            <button class="component-button" type="button" data-component="highlight">重点句</button>
+            <button class="component-button" type="button" data-component="flow">流程</button>
+            <button class="component-button" type="button" data-component="footer">结尾署名</button>
+          </div></details>
         </div>
-        <p class="composer-note">文字和素材随文章自动保存。改好后点击“更新预览”，或按 ⌘ Enter。</p>
+        <p class="composer-note">修改会自动保存。改好后点“更新预览”；图片也可以直接粘贴到正文。</p>
         <p class="composer-note" id="wechatStatus">微信图片接口：正在检查…</p>
-        <button class="action" id="renderButton" type="button">生成 / 更新预览</button>
+        <button class="action" id="renderButton" type="button">更新右侧预览</button>
       </section>
-      <p class="theme-title">3. 选择排版主题</p>
+      <details class="editor-section"><summary><span>2</span> 调整排版 <small>可选</small></summary><p class="composer-note">选择喜欢的样式，右侧立即更新，正文不会改变。</p>
       <div class="themes" aria-label="选择文章主题">
         <button class="theme-card" type="button" data-theme="editorial" aria-pressed="true"><span class="theme-preview editorial"></span><span class="theme-name">墨绿编辑部</span></button>
         <button class="theme-card" type="button" data-theme="paper" aria-pressed="false"><span class="theme-preview paper"></span><span class="theme-name">暖纸手记</span></button>
@@ -263,34 +265,39 @@
         <button class="theme-card" type="button" data-theme="coffee" aria-pressed="false"><span class="theme-preview coffee"></span><span class="theme-name">咖啡书页</span></button>
         <button class="theme-card" type="button" data-theme="peach" aria-pressed="false"><span class="theme-preview peach"></span><span class="theme-name">桃气手帐</span></button>
       </div>
-      <div class="actions">
-        <button class="action" id="copySourceButton" type="button">复制 HTML 源码（推荐）</button>
-        <button class="action secondary" id="copyButton" type="button">复制公众号富文本</button>
-        <button class="action secondary" id="downloadButton" type="button">下载 HTML</button>
-      </div>
-      <section class="composer" aria-label="导入公众号草稿">
-        <p class="theme-title">4. 导入公众号草稿</p>
+      </details>
+
+      <section class="composer publish-section" aria-label="导入公众号草稿">
+        <h2 class="step-title"><span>3</span> 封面与微信草稿</h2><p class="composer-note">右侧先看封面。发送后仍是草稿，可在微信里继续检查。</p>
         <div id="draftFields">
           <label class="field-label" for="draftAuthor">公众号作者（不含日期）</label>
           <input class="field" id="draftAuthor" placeholder="唐泽龙">
           <label class="field-label" for="draftDigest">摘要（可选）</label>
           <textarea class="editor" id="draftDigest" style="min-height:80px" placeholder="一句话介绍这篇文章"></textarea>
-          <label class="field-label" for="draftCover">封面图片（JPG / PNG，小于 1 MB）</label>
-          <input id="draftCover" type="file" accept="image/jpeg,image/png">
-          <img id="draftCoverPreview" alt="待导入的封面预览" hidden style="width:100%;margin:10px 0;">
+          <label class="field-label" for="draftCover">选择或更换封面</label>
+          <input id="draftCover" type="file" accept="image/jpeg,image/png"><p class="composer-note">JPG / PNG，小于 1 MB。封面用于文章列表，不会重复插入正文。</p>
+          
         </div>
         <p class="composer-note" id="draftResult" role="status" aria-live="polite">保存为草稿，不会群发或正式发布。</p>
-        <button class="action" id="draftButton" type="button">导入公众号草稿</button>
+        <button class="action" id="draftButton" type="button">送到微信草稿箱</button>
       </section>
-      <ul class="meta">
-        <li>正文：16px / 1.9 行距</li>
-        <li>主色：墨绿；紫色仅作标记</li>
-        <li>推荐：关闭壹伴 MD，再粘贴源码</li>
-        <li>源码中的图片保留为插入位置</li>
-        <li>发布：本页不会自动保存或发表</li>
-      </ul>
+
+      <details class="export-tools"><summary>复制与下载</summary><div class="actions">
+        <button class="action" id="copySourceButton" type="button">复制 HTML 源码（推荐）</button>
+        <button class="action secondary" id="copyButton" type="button">复制公众号富文本</button>
+        <button class="action secondary" id="downloadButton" type="button">下载 HTML</button>
+      </div>
+      </details>
     </aside>
 
+    <div class="preview-column">
+      <section class="cover-card" aria-label="公众号封面预览">
+        <div class="preview-label"><span>封面预览</span><label for="draftCover">更换封面</label></div>
+        <img id="draftCoverPreview" alt="公众号文章封面" hidden>
+        <div id="coverPlaceholder">还没有封面<br><label for="draftCover">选择一张图片</label></div>
+        <div class="cover-card-text"><h2 id="coverCardTitle"></h2><p id="coverCardDigest"></p></div>
+      </section>
+      <p class="preview-label body-preview-label">正文预览 <span>这里显示读者看到的文章</span></p>
     <section class="phone" aria-label="公众号手机预览">
       <div class="phone-top"></div>
       <header class="native-header">
@@ -388,7 +395,9 @@
         </section>
       </div>
     </section>
+    </div>
   </main>
+  <input id="bodyImageInput" type="file" accept="image/png,image/jpeg" hidden>
   <input id="imageFileInput" type="file" accept="image/png,image/jpeg" hidden>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script>
@@ -756,6 +765,7 @@
     }
 
     function saveEditorState() {
+      updateCoverPreview();
       localStorage.setItem(draftKey, JSON.stringify({
         title: titleInput.value,
         byline: bylineInput.value,
@@ -765,6 +775,13 @@
         digest: document.querySelector('#draftDigest').value
       }));
       window.scheduleArticleSave?.();
+    }
+
+    function updateCoverPreview() {
+      const image = document.querySelector('#draftCoverPreview');
+      document.querySelector('#coverPlaceholder').hidden = !image.hidden;
+      document.querySelector('#coverCardTitle').textContent = titleInput.value.trim() || '文章标题';
+      document.querySelector('#coverCardDigest').textContent = document.querySelector('#draftDigest').value.trim() || '摘要会显示在这里';
     }
 
     function renderEditorArticle(showMessage = true) {
@@ -838,6 +855,19 @@
       reader.onerror = () => showToast('图片读取失败，请重新选择');
       reader.readAsDataURL(file);
     }
+
+    document.querySelector('#insertBodyImage').addEventListener('click', () => {
+      const picker = document.querySelector('#bodyImageInput'); picker.value = ''; picker.click();
+    });
+    document.querySelector('#bodyImageInput').addEventListener('change', event => {
+      const file = event.target.files[0];
+      if (!file) return;
+      if (!['image/png', 'image/jpeg'].includes(file.type) || file.size >= 1024 * 1024) return showToast('请选择小于 1 MB 的 JPG 或 PNG 图片');
+      const key = `image-${crypto.randomUUID()}`;
+      markdownInput.setRangeText(`\n\n:::image ${key}\n${file.name.replace(/\.[^.]+$/, '')}\n:::\n\n`, markdownInput.selectionStart, markdownInput.selectionEnd, 'end');
+      renderEditorArticle(false);
+      putImageInSlot(file, key);
+    });
 
     async function imageAsDataUrl(image) {
       if (image.src.startsWith('data:')) return image.src;
@@ -1106,6 +1136,7 @@
       coverDataUrl = '';
       const preview = document.querySelector('#draftCoverPreview');
       preview.hidden = true;
+      updateCoverPreview();
       const file = draftCover.files[0];
       if (!file) return;
       if (!['image/png', 'image/jpeg'].includes(file.type) || file.size >= 1024 * 1024) {
@@ -1117,6 +1148,7 @@
         coverDataUrl = await fileDataUrl(file);
         preview.src = coverDataUrl;
         preview.hidden = false;
+        updateCoverPreview();
         draftResult.textContent = '封面已就绪，导入只会保存为草稿。';
         window.scheduleArticleSave?.();
       } catch (error) { draftResult.textContent = error.message; }
@@ -1163,10 +1195,10 @@
       } finally { importBusy = false; }
     });
     [titleInput, bylineInput, markdownInput, draftCover, document.querySelector('#draftAuthor'), document.querySelector('#draftDigest')].forEach(input => input.addEventListener('input', () => {
-      if (!importBusy && draftButton.textContent === '已导入草稿') { draftButton.disabled = false; draftButton.textContent = '导入公众号草稿'; }
+      if (!importBusy && draftButton.textContent === '已导入草稿') { draftButton.disabled = false; draftButton.textContent = '送到微信草稿箱'; }
     }));
     document.querySelectorAll('[data-theme]').forEach(button => button.addEventListener('click', () => {
-      if (!importBusy && draftButton.textContent === '已导入草稿') { draftButton.disabled = false; draftButton.textContent = '导入公众号草稿'; }
+      if (!importBusy && draftButton.textContent === '已导入草稿') { draftButton.disabled = false; draftButton.textContent = '送到微信草稿箱'; }
     }));
 
     try {
