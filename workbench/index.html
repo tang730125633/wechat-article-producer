@@ -269,14 +269,13 @@
       </details>
 
       <section class="composer publish-section" aria-label="导入公众号草稿">
-        <h2 class="step-title"><span>3</span> 封面与微信草稿</h2><p class="composer-note">右侧先看封面。发送后仍是草稿，可在微信里继续检查。</p>
+        <h2 class="step-title"><span>3</span> 发送微信草稿</h2><p class="composer-note">封面在右侧统一设置。确认预览后，每次点击都会新建一份微信草稿。</p>
         <div id="draftFields">
           <label class="field-label" for="draftAuthor">公众号作者（不含日期）</label>
           <input class="field" id="draftAuthor" placeholder="唐泽龙">
           <label class="field-label" for="draftDigest">摘要（可选）</label>
           <textarea class="editor" id="draftDigest" style="min-height:80px" placeholder="一句话介绍这篇文章"></textarea>
-          <label class="field-label" for="draftCover">选择或更换封面</label>
-          <input id="draftCover" type="file" accept="image/jpeg,image/png"><button class="component-button" id="pasteCover" type="button">粘贴封面图片</button><p class="composer-note" id="coverPasteHint">可选择文件，或点击“粘贴封面图片”后按 ⌘V。支持小于 1 MB 的 JPG / PNG。</p>
+
 
         </div>
         <p class="composer-note" id="draftResult" role="status" aria-live="polite">每次点击都会新建一份微信草稿，不覆盖旧稿，也不会正式发布。</p>
@@ -293,9 +292,11 @@
 
     <div class="preview-column" id="readerPreview">
       <section class="cover-card" tabindex="0" aria-label="公众号封面预览，选中后可粘贴图片">
-        <div class="preview-label"><span>封面预览</span><label for="draftCover">更换封面</label></div>
+        <div class="preview-label"><strong>封面图片</strong><div class="cover-buttons"><button id="chooseCover" type="button">选择图片</button><button id="pasteCover" type="button">粘贴图片</button></div></div>
+        <input id="draftCover" type="file" accept="image/jpeg,image/png" hidden>
         <img id="draftCoverPreview" alt="公众号文章封面" hidden>
-        <div id="coverPlaceholder">还没有封面<br><label for="draftCover">选择一张图片</label></div>
+        <div id="coverPlaceholder">还没有封面<br>点击上方“选择图片”，或在这个区域按 ⌘V</div>
+        <div class="cover-feedback"><p id="coverStatus" role="status" aria-live="polite">选择或粘贴图片后，这里会显示结果。</p><p id="coverInfo"></p></div>
         <div class="cover-card-text"><h2 id="coverCardTitle"></h2><p id="coverCardDigest"></p></div>
       </section>
       <p class="preview-label body-preview-label">正文预览 <span>这里显示读者看到的文章</span></p>
@@ -1133,38 +1134,91 @@
         reader.readAsDataURL(file);
       });
     }
-    async function setCoverImage(file) {
+    let coverGeneration = 0;
+    let coverPending = Promise.resolve();
+    let coverMeta = {};
+    let confirmedCover = '';
+    let coverError = '';
+    function coverMessage(text, error = false) {
+      const status = document.querySelector('#coverStatus');
+      status.textContent = text;
+      status.dataset.error = String(error);
+    }
+    function coverInfo() {
+      const image = document.querySelector('#draftCoverPreview');
+      document.querySelector('#coverInfo').textContent = coverDataUrl
+        ? `${coverMeta.name || '当前封面'} · ${coverMeta.width || image.naturalWidth} × ${coverMeta.height || image.naturalHeight}` : '';
+    }
+    window.loadSavedCover = (source, meta) => {
+      ++coverGeneration; coverPending = Promise.resolve(); coverError = '';
+      coverDataUrl = source || ''; confirmedCover = coverDataUrl; coverMeta = meta || {};
       const preview = document.querySelector('#draftCoverPreview');
-      if (!file) return;
-      if (!['image/png', 'image/jpeg'].includes(file.type) || file.size >= 1024 * 1024) {
-        draftResult.textContent = '请选择小于 1 MB 的 JPG 或 PNG 封面';
-        draftCover.value = '';
-        return;
-      }
-      try {
-        coverDataUrl = await fileDataUrl(file);
-        preview.src = coverDataUrl;
-        preview.hidden = false;
-        updateCoverPreview();
-        draftResult.textContent = '封面已就绪，导入只会保存为草稿。';
-        document.querySelector('#coverPasteHint').textContent = '封面已更新，右侧可预览；也可以继续粘贴替换。';
-        window.scheduleArticleSave?.();
-      } catch (error) { draftResult.textContent = error.message; }
+      preview.src = coverDataUrl; preview.hidden = !coverDataUrl; draftCover.value = '';
+      updateCoverPreview();
+      coverMessage(coverDataUrl ? '当前封面 · 已保存到网站' : '选择图片，或在这个区域按 ⌘V 粘贴。');
+      const turn = coverGeneration;
+      if (coverDataUrl) preview.decode().then(() => { if (turn === coverGeneration) coverInfo(); }).catch(() => { if (turn === coverGeneration) coverMessage('封面图片无法显示，请在这里重新选择。', true); });
+      else coverInfo();
+    };
+    window.coverSaved = source => {
+      confirmedCover = source || '';
+      if (coverDataUrl && source === coverDataUrl && !coverError) coverMessage('封面已更新 · 已保存到网站');
+    };
+    window.coverSaveFailed = message => {
+      if (coverDataUrl !== confirmedCover) coverMessage('新封面尚未保存：' + message, true);
+    };
+    function setCoverImage(file, turn = ++coverGeneration) {
+      if (!file) return Promise.resolve();
+      coverError = '';
+      const articleId = new URLSearchParams(location.search).get('article');
+      const job = (async () => {
+        try {
+          if (!['image/png', 'image/jpeg'].includes(file.type)) throw new Error('请选择 JPG 或 PNG 图片，原封面未改动。');
+          if (file.size >= 1024 * 1024) throw new Error(`这张图为 ${(file.size / 1024 / 1024).toFixed(1)} MB，微信封面需小于 1 MB；原封面未改动。`);
+          coverMessage('正在读取新图片…');
+          const source = await fileDataUrl(file);
+          const decoded = new Image(); decoded.src = source; await decoded.decode();
+          if (turn !== coverGeneration) return;
+          if (articleId !== new URLSearchParams(location.search).get('article')) { coverMessage('文章已切换，请在当前文章重新选择封面。'); return; }
+          coverDataUrl = source;
+          coverMeta = {name:file.name || '粘贴的图片', width:decoded.naturalWidth, height:decoded.naturalHeight, updated_at:Date.now()};
+          const preview = document.querySelector('#draftCoverPreview');
+          preview.src = source; preview.hidden = false;
+          updateCoverPreview(); coverInfo();
+          coverMessage('新封面已显示 · 正在保存…');
+          window.scheduleArticleSave?.();
+        } catch (error) {
+          if (turn !== coverGeneration) return;
+          coverError = error.name === 'EncodingError' ? '这张图片无法读取，原封面未改动。请换一张 JPG 或 PNG 图片。' : error.message;
+          coverMessage(coverError, true);
+        }
+      })();
+      coverPending = job;
+      return job;
     }
-    draftCover.addEventListener('change', () => setCoverImage(draftCover.files[0]));
-    document.querySelector('#pasteCover').addEventListener('click', () => {
-      document.querySelector('#coverPasteHint').textContent = '现在按 ⌘V（Windows 按 Ctrl+V），即可粘贴已复制的图片。';
+    document.querySelector('#chooseCover').addEventListener('click', () => { draftCover.value = ''; draftCover.click(); });
+    draftCover.addEventListener('change', () => { const file = draftCover.files[0]; draftCover.value = ''; setCoverImage(file); });
+    document.querySelector('#pasteCover').addEventListener('click', async () => {
+      const turn = ++coverGeneration;
       document.querySelector('#pasteCover').focus();
+      try {
+        const items = await navigator.clipboard.read();
+        if (turn !== coverGeneration) return;
+        for (const item of items) {
+          const type = item.types.find(type => ['image/png', 'image/jpeg'].includes(type));
+          if (type) { await setCoverImage(new File([await item.getType(type)], '粘贴的图片', {type}), turn); return; }
+        }
+        coverMessage('剪贴板里没有图片，请先复制图片本身。', true);
+      } catch (_) {
+        if (turn === coverGeneration) coverMessage('现在按 ⌘V（Windows 按 Ctrl+V）即可粘贴图片。');
+      }
     });
-    for (const target of [document.querySelector('#pasteCover'), document.querySelector('.cover-card')]) {
-      target.addEventListener('paste', event => {
-        const image = [...(event.clipboardData?.items || [])].find(item => item.type.startsWith('image/'));
-        if (!image) { document.querySelector('#coverPasteHint').textContent = '剪贴板里没有图片。请先复制图片本身，再回来粘贴。'; return; }
-        event.preventDefault(); event.stopPropagation();
-        draftCover.value = '';
-        setCoverImage(image.getAsFile());
-      });
-    }
+    document.querySelector('.cover-card').addEventListener('paste', event => {
+      const image = [...(event.clipboardData?.items || [])].find(item => item.type.startsWith('image/'));
+      if (!image) { coverMessage('剪贴板里没有图片，请先复制图片本身。', true); return; }
+      event.preventDefault(); event.stopPropagation();
+      setCoverImage(image.getAsFile());
+    });
     document.querySelectorAll('#draftAuthor, #draftDigest').forEach(input => input.addEventListener('input', saveEditorState));
     async function postWechat(path, body) {
       const response = await fetch(apiPath(path), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -1174,6 +1228,9 @@
     }
     draftButton.addEventListener('click', async () => {
       if (importBusy) return;
+      await coverPending;
+      if (importBusy) return;
+      if (coverError) { draftResult.textContent = '封面尚未准备好，请查看右侧封面区的提示。'; return; }
       if (!canUseApi) { draftResult.textContent = '微信连接尚未就绪，请稍后重试'; return; }
       if (!titleInput.value.trim() || !markdownInput.value.trim()) { draftResult.textContent = '请先填写标题和正文'; return; }
       if (!coverDataUrl) { draftResult.textContent = '请先选择封面图片'; draftCover.focus(); return; }

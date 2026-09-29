@@ -37,6 +37,8 @@ body {background:#f4f6f4}
 .preview-column {min-width:0}.cover-card {background:#fff;border:1px solid #e1e7e2;border-radius:10px;overflow:hidden;margin:0 0 28px}.preview-label {display:flex;align-items:center;justify-content:space-between;padding:14px 20px;margin:0;font-size:12px;color:#68736e}.preview-label label {cursor:pointer;color:#0b7a65}
 #draftCoverPreview {display:block;width:100%;aspect-ratio:2.35;object-fit:cover;margin:0;border-block:1px solid #edf0ed}#coverPlaceholder {padding:48px 20px;background:#f6f8f6;text-align:center;font-size:14px;line-height:2;color:#8a9690}#coverPlaceholder label {color:#0b7a65;cursor:pointer;font-size:12px}
 .cover-card-text {padding:18px 22px}.cover-card-text h2 {font-size:18px;line-height:1.6;margin:0;font-weight:600;color:#24312d}.cover-card-text p {font-size:13px;line-height:1.7;margin:8px 0 0;color:#68736e}
+.cover-buttons {display:flex;gap:8px}.cover-buttons button{font:inherit;border:1px solid #cad9cf;border-radius:5px;background:#fff;padding:8px 12px;color:#0b6554;cursor:pointer}.cover-buttons button:hover{background:#edf5f0}
+.cover-feedback {padding:12px 20px;border-bottom:1px solid #edf0ed;background:#fafcfb}.cover-feedback p{margin:0;font-size:12px;line-height:1.7;color:#0b6554}.cover-feedback #coverInfo{color:#8a9690;font-size:11px;overflow-wrap:anywhere}.cover-feedback [data-error="true"]{color:#a13d30}
 .body-preview-label {padding:0 2px 12px}.body-preview-label span {color:#9aa49e}.phone {border:1px solid #e1e7e2;border-radius:10px;box-shadow:none;background:#fff}.phone-top {display:none}
 :focus-visible {outline:2px solid #0b7a65;outline-offset:3px}
 .mobile-preview-link {display:none;color:#0b7a65;font-size:13px;text-decoration:none;margin-bottom:18px}

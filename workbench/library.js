@@ -22,7 +22,7 @@
   function documentState() {
     return {title:titleInput.value.trim() || '未命名文章', byline:bylineInput.value, markdown:markdownInput.value,
       theme:activeTheme, author:$('#draftAuthor').value, digest:$('#draftDigest').value,
-      cover:coverDataUrl, images:Object.fromEntries(imageAssets), wechat:current?.document.wechat || null};
+      cover:coverDataUrl, cover_meta:coverMeta, images:Object.fromEntries(imageAssets), wechat:current?.document.wechat || null};
   }
 
   function switchView(edit) {
@@ -84,8 +84,7 @@
     titleInput.value = doc.title || ''; bylineInput.value = doc.byline || '';
     markdownInput.value = doc.markdown || ''; activeTheme = themes[doc.theme] ? doc.theme : 'editorial';
     $('#draftAuthor').value = doc.author || ''; $('#draftDigest').value = doc.digest || '';
-    coverDataUrl = doc.cover || ''; draftCover.value = '';
-    $('#draftCoverPreview').src = coverDataUrl; $('#draftCoverPreview').hidden = !coverDataUrl;
+    window.loadSavedCover(doc.cover, doc.cover_meta);
     imageAssets.clear(); for (const [key,value] of Object.entries(doc.images || {})) imageAssets.set(key,value);
     draftButton.disabled = false; draftButton.textContent = doc.wechat ? '再次导入一份' : '导入公众号草稿';
     draftResult.textContent = '每次点击都会新建一份微信草稿，不覆盖旧稿，也不会正式发布。';
@@ -124,12 +123,14 @@
         copied = true;
       }
       current = result; dirty = generation !== before;
+      window.coverSaved?.(result.document.cover);
       conflict = false;
       if (!dirty) sessionStorage.removeItem('tang-editor-recovery');
       status.textContent = dirty ? '还有新修改待保存' : copied ? '已另存一份，原文章保持不变' : `已保存 · ${new Date().toLocaleTimeString('zh-CN',{hour12:false})}`;
       if (copied) showToast('你的修改已另存为新文章，可以继续送到微信草稿箱');
       return result;
     })().catch(error => {
+      window.coverSaveFailed?.(error.message);
       dirty = true; conflict = error.status === 409; showError(error); throw error;
     }).finally(() => { saving = null; });
     await saving;
