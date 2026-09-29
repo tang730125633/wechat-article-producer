@@ -232,7 +232,11 @@ def create_draft(body):
     article_id = body.get("article_id", "")
     if not isinstance(article_id, str) or len(article_id) > 100:
         raise WeChatError("文章编号格式错误")
-    fingerprint = hashlib.sha256(json.dumps(article, ensure_ascii=False, sort_keys=True).encode() + image + keychain_get("appid").encode() + article_id.encode()).hexdigest()
+    request_id = body.get("request_id", "")
+    if not isinstance(request_id, str) or len(request_id) > 128:
+        raise WeChatError("本次导入编号格式错误")
+    operation = b"\0" + request_id.encode() if request_id else b""
+    fingerprint = hashlib.sha256(json.dumps(article, ensure_ascii=False, sort_keys=True).encode() + image + keychain_get("appid").encode() + article_id.encode() + operation).hexdigest()
     # One owner's imports are serialized; successful and uncertain receipts survive restart.
     with DRAFT_LOCK:
         previous = library.receipt_get(fingerprint)

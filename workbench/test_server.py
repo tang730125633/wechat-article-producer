@@ -117,7 +117,7 @@ class ServerTests(unittest.TestCase):
     @mock.patch("server.wechat_request")
     def test_draft_uses_permanent_cover_and_reuses_receipt(self, request, _keychain):
         server.DRAFT_RECEIPTS.clear()
-        body = dict(title="掌控感", author="唐泽龙", digest="生活随笔", content="<p>保留我的犹豫</p>", cover_data_url=self.data_url("image/png", b"\x89PNG\r\n\x1a\nTEST"))
+        body = dict(title="掌控感", author="唐泽龙", digest="生活随笔", content="<p>保留我的犹豫</p>", request_id="click-1", cover_data_url=self.data_url("image/png", b"\x89PNG\r\n\x1a\nTEST"))
         request.side_effect = [{"media_id": "permanent-cover"}, {"media_id": "draft-1"}, {"news_item": [{"title": body["title"], "content": body["content"], "thumb_media_id": "permanent-cover"}]}]
         self.assertTrue(server.create_draft(body)["verified"])
         self.assertTrue(server.create_draft(body)["reused"])
@@ -125,6 +125,11 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(request.call_args_list[0].args[0], "material/add_material?type=image")
         payload = server.json.loads(request.call_args_list[1].args[1])
         self.assertEqual(payload["articles"][0]["thumb_media_id"], "permanent-cover")
+        request.side_effect = [{"media_id": "cover-2"}, {"media_id": "draft-2"}, {"news_item": [{"title": body["title"], "content": body["content"], "thumb_media_id": "cover-2"}]}]
+        another = server.create_draft({**body, "request_id":"click-2"})
+        self.assertEqual(another["media_id"], "draft-2")
+        self.assertTrue(another["verified"])
+        self.assertEqual(request.call_count, 6)
 
     @mock.patch("server.keychain_get", return_value="draft-test-account")
     @mock.patch("server.wechat_request")

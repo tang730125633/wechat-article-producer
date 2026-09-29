@@ -87,8 +87,8 @@
     coverDataUrl = doc.cover || ''; draftCover.value = '';
     $('#draftCoverPreview').src = coverDataUrl; $('#draftCoverPreview').hidden = !coverDataUrl;
     imageAssets.clear(); for (const [key,value] of Object.entries(doc.images || {})) imageAssets.set(key,value);
-    draftButton.disabled = false; draftButton.textContent = '送到微信草稿箱';
-    draftResult.textContent = doc.wechat ? '这篇文章曾送入微信草稿箱，后续修改不会自动更新微信。' : '保存为微信草稿，不会群发或正式发布。';
+    draftButton.disabled = false; draftButton.textContent = doc.wechat ? '再次导入一份' : '导入公众号草稿';
+    draftResult.textContent = '每次点击都会新建一份微信草稿，不覆盖旧稿，也不会正式发布。';
     if (!renderEditorArticle(false)) { article.innerHTML = ''; $('#previewTitle').textContent = doc.title || '未命名文章'; $('#previewByline').textContent = doc.byline || ''; }
     saveEditorState();
     updateCoverPreview();
