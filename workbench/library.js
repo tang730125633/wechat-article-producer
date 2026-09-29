@@ -169,8 +169,10 @@
     } catch(error) { showError(error); }
   });
   $('#copyForPolish').addEventListener('click', async () => {try {await navigator.clipboard.writeText(markdownInput.value); showToast('正文已复制；润色后贴回正文框，再更新预览');}catch(error){showToast('复制失败，请在正文框内手动复制');} });
-  $('#recoverBrowserDraft').hidden = !browserDraft || !JSON.parse(browserDraft || '{}').markdown;
-  $('#recoverBrowserDraft').addEventListener('click', () => create(JSON.parse(browserDraft)).catch(showError));
+  let recoverable = null;
+  try { recoverable = JSON.parse(browserDraft || 'null'); } catch (_) { /* Keep malformed local data untouched. */ }
+  $('#recoverBrowserDraft').hidden = !recoverable?.markdown;
+  $('#recoverBrowserDraft').addEventListener('click', () => create(recoverable).catch(showError));
   window.addEventListener('beforeunload', event => {if(dirty || saving){event.preventDefault();event.returnValue='';} });
 
   async function initialize() {
