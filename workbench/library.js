@@ -101,17 +101,35 @@
   async function save(source = '网页微调') {
     clearTimeout(timer);
     if (!current || !signedIn || loading) return;
-    if (conflict) throw new Error('存在其他位置的新版本，请先刷新文章库查看，当前修改已留在浏览器。');
     if (saving) { await saving; return dirty ? save(source) : current; }
     if (!dirty && current.revision) return current;
-    const before = generation;
+    let before = generation;
     const payload = {id:current.id, revision:current.revision, archived:current.archived, source, document:documentState()};
     status.textContent = '正在保存到网站…';
-    saving = request('/api/articles', payload).then(result => {
+    saving = (async () => {
+      let result, copied = false;
+      try {
+        result = await request('/api/articles', payload);
+      } catch (error) {
+        if (error.status !== 409) throw error;
+        // Preserve the latest local edits as a new article; never overwrite the other writer.
+        current = {...current, id:crypto.randomUUID(), revision:0, archived:false, document:{...current.document, wechat:source === '已送微信草稿箱' ? current.document.wechat : null}};
+        before = generation;
+        status.textContent = '另一处已有更新，正在为你另存一份…';
+        history.replaceState(null, '', location.pathname + '?article=' + encodeURIComponent(current.id));
+        localStorage.setItem('tang-active-article', current.id);
+        const copy = {id:current.id, revision:0, archived:false, source:'版本冲突，保留当前修改另存', document:documentState()};
+        try { sessionStorage.setItem('tang-editor-recovery', JSON.stringify(copy)); } catch (_) { }
+        result = await request('/api/articles', copy);
+        copied = true;
+      }
       current = result; dirty = generation !== before;
-      status.textContent = dirty ? '还有新修改待保存' : `已保存 · ${new Date().toLocaleTimeString('zh-CN',{hour12:false})}`;
+      conflict = false;
+      if (!dirty) sessionStorage.removeItem('tang-editor-recovery');
+      status.textContent = dirty ? '还有新修改待保存' : copied ? '已另存一份，原文章保持不变' : `已保存 · ${new Date().toLocaleTimeString('zh-CN',{hour12:false})}`;
+      if (copied) showToast('你的修改已另存为新文章，可以继续送到微信草稿箱');
       return result;
-    }).catch(error => {
+    })().catch(error => {
       dirty = true; conflict = error.status === 409; showError(error); throw error;
     }).finally(() => { saving = null; });
     await saving;
@@ -123,6 +141,7 @@
   window.scheduleArticleSave = () => {
     if (loading || !current) return;
     generation++; dirty = true;
+    try { sessionStorage.setItem('tang-editor-recovery', JSON.stringify({id:current.id, revision:current.revision, document:documentState()})); } catch (_) { /* Server save still proceeds if browser storage is full. */ }
     status.textContent = '有修改，正在准备保存…';
     clearTimeout(timer);
     timer = setTimeout(() => save().catch(showError), 1000);
@@ -184,8 +203,18 @@
     if (!signedIn) {status.textContent = '请登录自己的文章库'; return;}
     status.textContent = '文章库已连接';
     await refresh();
+    if (new URLSearchParams(location.search).get('recover') === '1' && recoverable?.markdown) {
+      await create(recoverable);
+      showToast('浏览器暂存的文字已另存为新文章；旧页面可以留着核对图片');
+      return;
+    }
     const selected = new URLSearchParams(location.search).get('article');
-    if (selected) await openArticle(selected);
+    let pending = null;
+    try { pending = JSON.parse(sessionStorage.getItem('tang-editor-recovery') || 'null'); } catch (_) { }
+    if (pending && pending.id === selected) {
+      applyDocument({id:pending.id, revision:pending.revision, archived:false, document:pending.document});
+      dirty = true; generation++; await save('恢复当前页面未保存的修改');
+    } else if (selected) await openArticle(selected);
   }
   $('#ownerLogin').addEventListener('submit', async event => {
     event.preventDefault();

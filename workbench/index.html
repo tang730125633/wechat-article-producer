@@ -1182,7 +1182,7 @@
         draftResult.textContent = '正在保存到公众号草稿箱…';
         creatingDraft = true;
         const result = await postWechat('/api/wechat/draft', {
-          ...values, content: clone.outerHTML
+          ...values, content: clone.outerHTML, article_id: new URLSearchParams(location.search).get('article') || ''
         });
         draftResult.textContent = result.verified ? '已保存并读回核对。请到公众号草稿箱查看；尚未发布。' : '微信已确认草稿创建，暂未完成读回核对。请到草稿箱查看，勿重复导入。';
         draftButton.textContent = '已导入草稿';

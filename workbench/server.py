@@ -229,7 +229,10 @@ def create_draft(body):
         raise WeChatError("请填写标题和正文")
     DraftImages().feed(article["content"])
     mime, filename, image = decode_image(body.get("cover_data_url"))
-    fingerprint = hashlib.sha256(json.dumps(article, ensure_ascii=False, sort_keys=True).encode() + image + keychain_get("appid").encode()).hexdigest()
+    article_id = body.get("article_id", "")
+    if not isinstance(article_id, str) or len(article_id) > 100:
+        raise WeChatError("文章编号格式错误")
+    fingerprint = hashlib.sha256(json.dumps(article, ensure_ascii=False, sort_keys=True).encode() + image + keychain_get("appid").encode() + article_id.encode()).hexdigest()
     # One owner's imports are serialized; successful and uncertain receipts survive restart.
     with DRAFT_LOCK:
         previous = library.receipt_get(fingerprint)

@@ -152,6 +152,8 @@ class ServerTests(unittest.TestCase):
             lib.save_article({"id":"essay", "revision":1, "document":{"title":"旧窗口", "markdown":"不能覆盖"}})
         self.assertEqual(lib.get_article("essay")["document"]["markdown"], "还没想明白")
         self.assertEqual(len(lib.versions("essay")), 2)
+        repeated = lib.save_article({"id":"essay", "revision":0, "document":second["document"], "archived":True})
+        self.assertEqual(repeated["revision"], 2)
 
     def test_login_code_can_only_be_used_once(self):
         lib = server.library

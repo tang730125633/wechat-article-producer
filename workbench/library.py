@@ -133,10 +133,10 @@ def save_article(body):
     with connect() as db:
         db.execute("BEGIN IMMEDIATE")
         old = db.execute("SELECT * FROM articles WHERE id=?", (article_id,)).fetchone()
-        if (old["revision"] if old else 0) != revision:
-            raise Conflict("文章已在另一处更新。你的修改仍保留在当前页面，请先查看最新版本再合并。")
         if old and old["document"] == encoded and old["archived"] == archived:
             return unpack(old)
+        if (old["revision"] if old else 0) != revision:
+            raise Conflict("文章已在另一处更新，请保留当前修改另存一份。")
         revision += 1
         db.execute("INSERT INTO articles VALUES (?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET document=excluded.document,revision=excluded.revision,archived=excluded.archived,updated=excluded.updated", (article_id, encoded, revision, archived, now))
         # ponytail: full snapshots fit a personal library; deduplicate images if storage grows.
