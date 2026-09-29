@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tang 公众号排版工作台</title>
+  <link rel="stylesheet" href="library.css">
   <style>
     :root {
       color-scheme: light;
@@ -206,6 +207,20 @@
   </style>
 </head>
 <body>
+  <header class="worktop">
+    <div><strong>唐泽龙的公众号工作台</strong><span>把聊出来的想法，留下来</span></div>
+    <nav aria-label="工作区"><button id="showLibrary" type="button">文章库</button><button id="showEditor" type="button">编写与预览</button></nav>
+    <span id="cloudSaveStatus" role="status" aria-live="polite">正在连接文章库…</span>
+    <button id="saveArticle" type="button">保存文章</button>
+  </header>
+  <section id="libraryPage" class="library-page" hidden>
+    <div class="library-heading"><div><h1>我的文章</h1><p>AI 帮你整理与制作，你在这里审阅、微调和确认。</p></div><button id="newArticle" type="button">＋ 新建文章</button></div>
+    <form id="ownerLogin" hidden><p>这是私人的文章库。请让你的 AI 获取本次登录码，再在这里登录。</p><label for="loginCode">一次性登录码</label><input id="loginCode" type="password" autocomplete="off"><button type="submit">登录工作台</button></form>
+    <div class="library-filters"><input id="articleSearch" placeholder="搜索文章标题" aria-label="搜索文章标题"><select id="articleFilter" aria-label="筛选文章"><option value="active">工作台草稿</option><option value="wechat">已送微信</option><option value="archived">已归档</option><option value="all">全部文章</option></select><button id="refreshLibrary" type="button">刷新</button></div>
+    <p id="libraryMessage" role="status"></p><div id="articleList" class="article-list"></div>
+    <button id="recoverBrowserDraft" type="button" hidden>另存当前浏览器里的旧稿</button>
+  </section>
+  <div id="articleTools" class="article-tools" hidden><span id="articleVersion"></span><select id="versionSelect" aria-label="历史版本"><option value="">历史版本</option></select><button id="restoreVersion" type="button">恢复所选版本</button><button id="archiveArticle" type="button">归档文章</button><button id="copyForPolish" type="button">复制正文给润色对话</button></div>
   <main class="shell">
     <aside class="panel">
       <p class="eyebrow">TANG EDITORIAL · V2</p>
@@ -388,6 +403,8 @@
     const draftKey = 'tang-wechat-layout-draft-v1';
     const imageAssets = new Map();
     const isPublicHost = !['127.0.0.1', 'localhost'].includes(location.hostname);
+    const apiPath = path => new URL(path.replace(/^\/api\//, 'api/'), location.href).href;
+    let canUseApi = !isPublicHost;
     let activeTheme = 'editorial';
     let selectedImageSlot = 0;
 
@@ -747,6 +764,7 @@
         author: document.querySelector('#draftAuthor').value,
         digest: document.querySelector('#draftDigest').value
       }));
+      window.scheduleArticleSave?.();
     }
 
     function renderEditorArticle(showMessage = true) {
@@ -801,6 +819,7 @@
       reader.onload = () => {
         const source = String(reader.result);
         imageAssets.set(imageKey, { preview: source });
+        window.scheduleArticleSave?.();
         const section = [...article.querySelectorAll('[data-role="image"]')].find(item => item.dataset.imageKey === imageKey);
         const visual = section?.querySelector('[data-image-slot]');
         if (visual) {
@@ -834,7 +853,7 @@
     }
 
     async function uploadSlotToWechat(section, button) {
-      if (isPublicHost) return showToast('线上版不上传微信。请复制源码后在公众号里插图，或用本机排版器上传。');
+      if (!canUseApi) return showToast('微信连接尚未就绪，请稍后重试');
       const image = section.querySelector('img');
       if (!image) return showToast('请先粘贴或选择一张图片');
       if (!confirm('将这张图片上传到当前配置的微信公众号？')) return;
@@ -843,7 +862,7 @@
       button.disabled = true;
       button.textContent = '正在上传…';
       try {
-        const response = await fetch('/api/wechat/upload-image', {
+        const response = await fetch(apiPath('/api/wechat/upload-image'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ data_url: await imageAsDataUrl(image) })
@@ -856,6 +875,7 @@
         liveImage.dataset.wechatSrc = result.url;
         imageAssets.set(imageKey, { preview: previewSource, wechat: result.url });
         prepareImageSlots();
+        window.scheduleArticleSave?.();
         showToast('图片已上传微信，正文地址已自动替换');
       } catch (error) {
         button.disabled = false;
@@ -899,13 +919,11 @@
 
     imageFileInput.addEventListener('change', () => putImageInSlot(imageFileInput.files[0], selectedImageSlot));
 
-    if (isPublicHost) {
-      wechatStatus.textContent = '线上版：排版、预览、复制可用。上传微信请用本机排版器。';
-    } else {
-      fetch('/api/wechat/status')
+    {
+      fetch(apiPath('/api/wechat/status'))
         .then(response => response.json())
-        .then(result => { wechatStatus.textContent = `微信图片接口：${result.configured ? '已配置，可以上传' : '未配置，请先运行 python3 server.py configure'}`; })
-        .catch(() => { wechatStatus.textContent = '微信图片接口：服务未启动'; });
+        .then(result => { canUseApi = result.app === 'wechat-article-producer-workbench-v2'; wechatStatus.textContent = result.configured ? '微信连接已配置，导入前会检查接口可用性。' : '微信连接尚未配置，可先编写和保存文章。'; })
+        .catch(() => { wechatStatus.textContent = '微信连接暂不可用，文章仍可编辑。'; });
     }
 
     document.querySelector('#renderButton').addEventListener('click', () => renderEditorArticle());
@@ -1100,31 +1118,19 @@
         preview.src = coverDataUrl;
         preview.hidden = false;
         draftResult.textContent = '封面已就绪，导入只会保存为草稿。';
+        window.scheduleArticleSave?.();
       } catch (error) { draftResult.textContent = error.message; }
     });
     document.querySelectorAll('#draftAuthor, #draftDigest').forEach(input => input.addEventListener('input', saveEditorState));
-    if (isPublicHost) {
-      document.querySelector('#draftFields').hidden = true;
-      draftButton.textContent = '打开本机导入草稿';
-      draftResult.textContent = '带上当前文字和主题到本机工作台，公众号凭据留在你的电脑。先启动项目中的“打开公众号排版器”。';
-    }
     async function postWechat(path, body) {
-      const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const response = await fetch(apiPath(path), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || '微信请求失败');
       return result;
     }
     draftButton.addEventListener('click', async () => {
       if (importBusy) return;
-      if (isPublicHost) {
-        if (article.querySelector('img') || imageAssets.size) {
-          draftResult.textContent = '当前有正文图片，请在本机工作台继续编辑并添加图片；本次不会丢弃图片转移。';
-          return;
-        }
-        saveEditorState();
-        window.open('http://127.0.0.1:8767/#import=' + encodeURIComponent(localStorage.getItem(draftKey)), '_blank', 'noopener');
-        return;
-      }
+      if (!canUseApi) { draftResult.textContent = '微信连接尚未就绪，请稍后重试'; return; }
       if (!titleInput.value.trim() || !markdownInput.value.trim()) { draftResult.textContent = '请先填写标题和正文'; return; }
       if (!coverDataUrl) { draftResult.textContent = '请先选择封面图片'; draftCover.focus(); return; }
       importBusy = true;
@@ -1132,6 +1138,7 @@
       draftResult.textContent = '正在准备正文和封面…';
       let creatingDraft = false;
       try {
+        await window.saveCurrentArticle?.();
         renderEditorArticle(false);
         if (article.querySelector('.image-slot')) throw new Error('正文还有空图片位，请添加图片或删去空图片位');
         const values = { title: titleInput.value.trim(), author: document.querySelector('#draftAuthor').value.trim(), digest: document.querySelector('#draftDigest').value.trim(), cover_data_url: coverDataUrl };
@@ -1149,6 +1156,7 @@
         });
         draftResult.textContent = result.verified ? '已保存并读回核对。请到公众号草稿箱查看；尚未发布。' : '微信已确认草稿创建，暂未完成读回核对。请到草稿箱查看，勿重复导入。';
         draftButton.textContent = '已导入草稿';
+        await window.recordWechatReceipt?.(result);
       } catch (error) {
         draftResult.textContent = error instanceof TypeError && creatingDraft ? '连接中断，草稿结果暂不确定。请先查看草稿箱，勿立即重复导入。' : error.message;
         draftButton.disabled = creatingDraft && (error instanceof TypeError || error.message.includes('勿'));
@@ -1211,5 +1219,6 @@
     console.assert(checks.every(Boolean), '公众号正文结构检查失败');
     if (!checks.every(Boolean)) statusText.textContent = '兼容结构需要检查';
   </script>
+  <script src="library.js"></script>
 </body>
 </html>

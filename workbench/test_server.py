@@ -2,12 +2,21 @@ import base64
 import subprocess
 import time
 import unittest
+import tempfile
+from pathlib import Path
 from unittest import mock
 
 import server
 
 
 class ServerTests(unittest.TestCase):
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        patcher = mock.patch.object(server.library, "DATA", Path(folder.name))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def data_url(self, mime, payload):
         return f"data:{mime};base64," + base64.b64encode(payload).decode()
 
@@ -132,6 +141,25 @@ class ServerTests(unittest.TestCase):
         with self.assertRaisesRegex(server.WeChatError, "正文图片"):
             server.create_draft({"title": "图文", "content": '<img src="data:image/png;base64,AA==">'})
         request.assert_not_called()
+
+    def test_article_history_survives_edits_and_rejects_stale_writer(self):
+        lib = server.library
+        first = lib.save_article({"id":"essay", "revision":0, "document":{"title":"掌控感", "markdown":"也许"}, "source":"Codex"})
+        second = lib.save_article({"id":"essay", "revision":first["revision"], "document":{"title":"掌控感", "markdown":"还没想明白"}, "archived":True})
+        self.assertEqual(lib.get_article("essay", 1)["document"]["markdown"], "也许")
+        self.assertTrue(second["archived"])
+        with self.assertRaises(lib.Conflict):
+            lib.save_article({"id":"essay", "revision":1, "document":{"title":"旧窗口", "markdown":"不能覆盖"}})
+        self.assertEqual(lib.get_article("essay")["document"]["markdown"], "还没想明白")
+        self.assertEqual(len(lib.versions("essay")), 2)
+
+    def test_login_code_can_only_be_used_once(self):
+        lib = server.library
+        code = lib.login_code()
+        token = lib.login(code)
+        self.assertTrue(lib.authorized("", token))
+        self.assertIsNone(lib.login(code))
+        self.assertFalse(lib.authorized("invalid", "invalid"))
 
 
 if __name__ == "__main__":

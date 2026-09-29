@@ -18,8 +18,10 @@ import webbrowser
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from html.parser import HTMLParser
+from http.cookies import SimpleCookie
 from pathlib import Path
 from threading import Lock
+import library
 
 
 ROOT = Path(__file__).resolve().parent
@@ -30,6 +32,8 @@ KEYCHAIN_SERVICE = "Tang WeChat Publisher"
 TOKEN_CACHE = {"value": "", "expires_at": 0.0, "credentials": b""}
 DRAFT_RECEIPTS = {}
 DRAFT_LOCK = Lock()
+PUBLIC_ORIGIN = os.environ.get("WORKBENCH_PUBLIC_ORIGIN", "")
+CREDENTIAL_FILE = os.environ.get("WECHAT_CREDENTIAL_FILE", "")
 
 
 class WeChatError(Exception):
@@ -39,6 +43,11 @@ class WeChatError(Exception):
 
 
 def keychain_get(account):
+    if CREDENTIAL_FILE:
+        try:
+            return json.loads(Path(CREDENTIAL_FILE).read_text()).get(account, "")
+        except (OSError, ValueError):
+            return ""
     result = subprocess.run(
         ["security", "find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", account, "-w"],
         capture_output=True,
@@ -190,80 +199,130 @@ def create_draft(body):
     DraftImages().feed(article["content"])
     mime, filename, image = decode_image(body.get("cover_data_url"))
     fingerprint = hashlib.sha256(json.dumps(article, ensure_ascii=False, sort_keys=True).encode() + image + keychain_get("appid").encode()).hexdigest()
-    # ponytail: one local user's imports are serialized; receipts last until restart.
+    # One owner's imports are serialized; successful and uncertain receipts survive restart.
     with DRAFT_LOCK:
-        if fingerprint in DRAFT_RECEIPTS:
-            return {**DRAFT_RECEIPTS[fingerprint], "reused": True}
+        previous = library.receipt_get(fingerprint)
+        if previous:
+            if previous.get("pending"):
+                raise WeChatError("上次导入结果尚不确定，请先检查微信草稿箱，勿重复导入。")
+            return {**previous, "reused": True}
         boundary, upload = multipart_image(mime, filename, image)
         cover = wechat_request("material/add_material?type=image", upload, f"multipart/form-data; boundary={boundary}")
         if not cover.get("media_id"):
             raise WeChatError("微信未返回永久封面素材，请稍后检查素材库")
         article["thumb_media_id"] = cover["media_id"]
         article.update(need_open_comment=0, only_fans_can_comment=0)
+        library.receipt_put(fingerprint, {"pending": True})
         try:
             result = wechat_request("draft/add", json.dumps({"articles": [article]}, ensure_ascii=False).encode())
         except WeChatError as error:
             if error.errcode is None:
                 raise WeChatError("未收到草稿创建回执，结果暂不确定。请先查看公众号草稿箱，勿立即重复导入。") from error
+            library.receipt_delete(fingerprint)
             raise
         if not result.get("media_id"):
             raise WeChatError("微信未返回草稿编号，请先检查草稿箱，勿重复导入")
         receipt = {"media_id": result["media_id"], "title": article["title"], "verified": False}
-        DRAFT_RECEIPTS[fingerprint] = receipt
+        library.receipt_put(fingerprint, receipt)
         try:
             saved = wechat_request("draft/get", json.dumps({"media_id": result["media_id"]}).encode())
             item = saved.get("news_item", [{}])[0]
             receipt["verified"] = item.get("title") == article["title"] and item.get("content") == article["content"] and item.get("thumb_media_id") == article["thumb_media_id"]
         except (WeChatError, IndexError):
             pass  # Creation succeeded; readback failure must never create another draft.
+        library.receipt_put(fingerprint, receipt)
         return receipt
 
 
 def allowed_origin(origin):
-    return not origin or origin in {f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}"}
+    return not origin or origin in {f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}", PUBLIC_ORIGIN}
 
 
 class Handler(SimpleHTTPRequestHandler):
-    def send_json(self, status, payload):
+    def authenticated(self):
+        if not PUBLIC_ORIGIN:
+            return True
+        try:
+            cookies = SimpleCookie(self.headers.get("Cookie", ""))
+            cookie = cookies["tang_workbench"].value if "tang_workbench" in cookies else ""
+        except Exception:
+            cookie = ""
+        bearer = self.headers.get("Authorization", "").removeprefix("Bearer ")
+        return library.authorized(bearer, cookie)
+
+    def send_json(self, status, payload, cookie=None):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        if cookie:
+            self.send_header("Set-Cookie", f"tang_workbench={cookie}; HttpOnly; Secure; SameSite=Strict; Path=/wechat/; Max-Age=2592000")
         self.end_headers()
         self.wfile.write(body)
 
     def do_GET(self):
-        if self.path == "/api/wechat/status":
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == "/api/wechat/status":
             return self.send_json(200, {
                 "app": APP_ID,
                 "configured": bool(keychain_get("appid") and keychain_get("appsecret")),
+                "authenticated": self.authenticated(), "cloud": bool(PUBLIC_ORIGIN),
             })
+        if parsed.path.startswith("/api/"):
+            if not self.authenticated():
+                return self.send_json(401, {"error": "请先登录自己的文章工作台"})
+            query = urllib.parse.parse_qs(parsed.query)
+            article_id = query.get("id", [""])[0]
+            if parsed.path == "/api/articles":
+                if not article_id:
+                    return self.send_json(200, {"articles": library.list_articles()})
+                try:
+                    version = int(query["revision"][0]) if "revision" in query else None
+                except ValueError:
+                    return self.send_json(400, {"error": "版本格式错误"})
+                item = library.get_article(article_id, version)
+                return self.send_json(200 if item else 404, item or {"error": "文章不存在"})
+            if parsed.path == "/api/versions":
+                return self.send_json(200, {"versions": library.versions(article_id)})
+            return self.send_json(404, {"error": "接口不存在"})
+        # Source, credentials and database are never served by this process.
+        if parsed.path not in {"/", "/index.html", "/library.js", "/library.css", "/body-album.jpg"} and not parsed.path.startswith("/examples/"):
+            return self.send_json(404, {"error": "文件不存在"})
         return super().do_GET()
 
     def do_POST(self):
-        if self.path not in {"/api/wechat/upload-image", "/api/wechat/draft"}:
+        if self.path not in {"/api/wechat/upload-image", "/api/wechat/draft", "/api/articles", "/api/session"}:
             return self.send_json(404, {"error": "接口不存在"})
         if self.headers.get("Content-Type", "").split(";", 1)[0] != "application/json":
             return self.send_json(415, {"error": "请求格式错误"})
         if not allowed_origin(self.headers.get("Origin", "")):
-            return self.send_json(403, {"error": "只允许本地排版器调用"})
+            return self.send_json(403, {"error": "请从工作台页面发起操作"})
+        if self.path != "/api/session" and not self.authenticated():
+            return self.send_json(401, {"error": "请先登录自己的文章工作台"})
         try:
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
             return self.send_json(400, {"error": "请求长度错误"})
-        if not 0 < length < 3_000_000:
+        if not 0 < length < 16_000_000:
             return self.send_json(413, {"error": "请求过大，请缩小图片或正文后重试"})
         try:
             body = json.loads(self.rfile.read(length))
             if not isinstance(body, dict):
                 raise WeChatError("请求格式错误")
+            if self.path == "/api/session":
+                token = library.login(body.get("code", ""))
+                return self.send_json(200 if token else 401, {"ok": bool(token), "error": "" if token else "登录码已失效，请重新获取"}, cookie=token)
+            if self.path == "/api/articles":
+                return self.send_json(200, library.save_article(body))
             if self.path == "/api/wechat/draft":
                 self.send_json(200, create_draft(body))
             else:
                 url = upload_image(body.get("data_url", ""))
                 self.send_json(200, {"url": url})
-        except (json.JSONDecodeError, WeChatError) as error:
+        except library.Conflict as error:
+            self.send_json(409, {"error": str(error)})
+        except (ValueError, WeChatError) as error:
             self.send_json(400, {"error": str(error)})
 
 
@@ -298,13 +357,17 @@ def self_test():
 
 def main():
     parser = argparse.ArgumentParser(description="Tang 公众号排版工作台")
-    parser.add_argument("command", nargs="?", choices=["serve", "configure", "self-test"], default="serve")
+    parser.add_argument("command", nargs="?", choices=["serve", "configure", "self-test", "login-code"], default="serve")
     parser.add_argument("--open-browser", action="store_true")
     args = parser.parse_args()
     if args.command == "configure":
         return configure()
     if args.command == "self-test":
         return self_test()
+    if args.command == "login-code":
+        print(library.login_code())
+        return
+    library.owner_key()
     server = ThreadingHTTPServer((HOST, PORT), partial(Handler, directory=ROOT))
     print(f"公众号排版工作台：http://{HOST}:{PORT}/")
     if args.open_browser:
