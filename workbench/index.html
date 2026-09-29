@@ -292,7 +292,7 @@
 
     <div class="preview-column" id="readerPreview">
       <section class="cover-card" tabindex="0" aria-label="公众号封面预览，选中后可粘贴图片">
-        <div class="preview-label"><strong>封面图片</strong><div class="cover-buttons"><button id="chooseCover" type="button">选择图片</button><button id="pasteCover" type="button">粘贴图片</button></div></div>
+        <div class="preview-label"><strong>封面图片</strong><div class="cover-buttons"><button id="chooseCover" type="button">选择图片</button><button id="pasteCover" type="button">粘贴图片 · ⌘V</button></div></div>
         <input id="draftCover" type="file" accept="image/jpeg,image/png" hidden>
         <img id="draftCoverPreview" alt="公众号文章封面" hidden>
         <div id="coverPlaceholder">还没有封面<br>点击上方“选择图片”，或在这个区域按 ⌘V</div>
@@ -1198,20 +1198,9 @@
     }
     document.querySelector('#chooseCover').addEventListener('click', () => { draftCover.value = ''; draftCover.click(); });
     draftCover.addEventListener('change', () => { const file = draftCover.files[0]; draftCover.value = ''; setCoverImage(file); });
-    document.querySelector('#pasteCover').addEventListener('click', async () => {
-      const turn = ++coverGeneration;
+    document.querySelector('#pasteCover').addEventListener('click', () => {
       document.querySelector('#pasteCover').focus();
-      try {
-        const items = await navigator.clipboard.read();
-        if (turn !== coverGeneration) return;
-        for (const item of items) {
-          const type = item.types.find(type => ['image/png', 'image/jpeg'].includes(type));
-          if (type) { await setCoverImage(new File([await item.getType(type)], '粘贴的图片', {type}), turn); return; }
-        }
-        coverMessage('剪贴板里没有图片，请先复制图片本身。', true);
-      } catch (_) {
-        if (turn === coverGeneration) coverMessage('现在按 ⌘V（Windows 按 Ctrl+V）即可粘贴图片。');
-      }
+      coverMessage('现在按 ⌘V（Windows 按 Ctrl+V），新图片会显示在这里。');
     });
     document.querySelector('.cover-card').addEventListener('paste', event => {
       const image = [...(event.clipboardData?.items || [])].find(item => item.type.startsWith('image/'));
