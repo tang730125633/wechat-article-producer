@@ -161,6 +161,12 @@ class ServerTests(unittest.TestCase):
         self.assertIsNone(lib.login(code))
         self.assertFalse(lib.authorized("invalid", "invalid"))
 
+    def test_readback_accepts_entity_escaping_but_not_changed_text_or_markup(self):
+        original = '<p style="font-family:\'PingFang SC\'">我还没想明白 &amp; 保留犹豫</p>'
+        self.assertTrue(server.same_html(original, original.replace("'", "&#39;")))
+        self.assertFalse(server.same_html(original, original.replace("还没", "已经")))
+        self.assertFalse(server.same_html('<p>&lt;b&gt;文字&lt;/b&gt;</p>', '<p><b>文字</b></p>'))
+
 
 if __name__ == "__main__":
     unittest.main()

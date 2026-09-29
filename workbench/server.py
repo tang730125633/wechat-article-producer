@@ -187,6 +187,27 @@ class DraftImages(HTMLParser):
                 raise WeChatError("请先将正文图片上传到微信，再导入草稿")
 
 
+class Markup(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+
+    def handle_starttag(self, tag, attrs):
+        self.parts.append(("start", tag, sorted(attrs)))
+
+    def handle_endtag(self, tag):
+        self.parts.append(("end", tag))
+
+    def handle_data(self, data):
+        self.parts.append(("text", data))
+
+
+def same_html(left, right):
+    a, b = Markup(), Markup()
+    a.feed(left or ""); b.feed(right or "")
+    return a.parts == b.parts
+
+
 def create_draft(body):
     article = {}
     for key, label in (("title", "标题"), ("author", "作者"), ("digest", "摘要"), ("content", "正文")):
@@ -227,7 +248,7 @@ def create_draft(body):
         try:
             saved = wechat_request("draft/get", json.dumps({"media_id": result["media_id"]}).encode())
             item = saved.get("news_item", [{}])[0]
-            receipt["verified"] = item.get("title") == article["title"] and item.get("content") == article["content"] and item.get("thumb_media_id") == article["thumb_media_id"]
+            receipt["verified"] = item.get("title") == article["title"] and same_html(item.get("content"), article["content"]) and item.get("thumb_media_id") == article["thumb_media_id"]
         except (WeChatError, IndexError):
             pass  # Creation succeeded; readback failure must never create another draft.
         library.receipt_put(fingerprint, receipt)
