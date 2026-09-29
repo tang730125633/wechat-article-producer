@@ -204,7 +204,9 @@
     status.textContent = '文章库已连接';
     await refresh();
     if (new URLSearchParams(location.search).get('recover') === '1' && recoverable?.markdown) {
-      await create(recoverable);
+      const oldId = localStorage.getItem('tang-active-article');
+      const old = items.some(item => item.id === oldId) ? await request('/api/articles?id=' + encodeURIComponent(oldId)) : null;
+      await create({...old?.document, ...recoverable, wechat:null});
       showToast('浏览器暂存的文字已另存为新文章；旧页面可以留着核对图片');
       return;
     }
