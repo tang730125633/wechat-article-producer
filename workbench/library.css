@@ -39,4 +39,6 @@ body {background:#f4f6f4}
 .cover-card-text {padding:18px 22px}.cover-card-text h2 {font-size:18px;line-height:1.6;margin:0;font-weight:600;color:#24312d}.cover-card-text p {font-size:13px;line-height:1.7;margin:8px 0 0;color:#68736e}
 .body-preview-label {padding:0 2px 12px}.body-preview-label span {color:#9aa49e}.phone {border:1px solid #e1e7e2;border-radius:10px;box-shadow:none;background:#fff}.phone-top {display:none}
 :focus-visible {outline:2px solid #0b7a65;outline-offset:3px}
+.mobile-preview-link {display:none;color:#0b7a65;font-size:13px;text-decoration:none;margin-bottom:18px}
+@media(max-width:780px){.mobile-preview-link{display:block}}
 @media(max-width:780px){.shell{display:flex;flex-direction:column;padding:16px;gap:24px}.panel{position:static;max-height:none;width:100%;padding:20px}.preview-column{width:100%}.panel .intro{display:block}.worktop{padding:16px}.article-tools{padding:14px 18px 0}.cover-card{margin-bottom:24px}.phone{border-radius:8px}.native-header{display:block}.more-tools-body{max-width:calc(100vw - 36px)}}
