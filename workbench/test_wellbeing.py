@@ -9,9 +9,37 @@ from pathlib import Path
 from unittest.mock import patch
 import server
 import wellbeing
+import health_sync
 
 
 class WellbeingChecks(unittest.TestCase):
+    def test_automatic_check_is_not_a_fake_data_change_and_failures_remain_visible(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(server.library,'DATA',Path(folder)):
+            payload={'sync_source':'mac-bridge','sync_interval':900,'data':{'metrics':[
+                {'name':'sleep_analysis','units':'hr','data':[{'date':'2026-10-03','totalSleep':6.4}]}]}}
+            with patch('wellbeing.time.time',return_value=1000):
+                self.assertEqual(wellbeing.import_sleep(payload)['changed'],1)
+            with patch('wellbeing.time.time',return_value=2000):
+                self.assertEqual(wellbeing.import_sleep(payload)['changed'],0)
+                current=wellbeing.health_snapshot()
+                self.assertEqual(current['sleep'][0]['received'],1000)
+                self.assertEqual(current['sync']['sources'][0]['checked'],2000)
+                self.assertEqual(current['sync']['status'],'ok')
+            with patch('wellbeing.time.time',return_value=3000):
+                wellbeing.report_sync({'sync_source':'mac-bridge','sync_interval':900,'status':'error','error':'source_unavailable'})
+                self.assertEqual(wellbeing.health_snapshot()['sync']['status'],'error')
+                self.assertEqual(wellbeing.health_snapshot()['sync']['sources'][0]['success'],2000)
+            with patch('wellbeing.time.time',return_value=10000):
+                self.assertEqual(wellbeing.health_snapshot()['sync']['status'],'delayed')
+                self.assertEqual(wellbeing.health_snapshot()['sleep'][0]['totalSleep'],6.4)
+
+    def test_bridge_only_transfers_sleep_and_surfaces_source_failure(self):
+        raw={'data':{'metrics':[{'name':'heart_rate','data':[{'private':'not exported'}]},
+                              {'name':'sleep_analysis','data':[{'totalSleep':6.4}]}]}}
+        parsed=health_sync.sleep_payload({'result':{'content':[{'type':'text','text':json.dumps(raw)}]}})
+        self.assertEqual([m['name'] for m in parsed['data']['metrics']],['sleep_analysis'])
+        with self.assertRaises(health_sync.SyncError):health_sync.sleep_payload({'result':{'isError':True}})
+
     def test_private_routes_upload_scope_and_roundtrip(self):
         with tempfile.TemporaryDirectory() as folder, patch.object(server.library, 'DATA', Path(folder)), patch.object(server, 'PUBLIC_ORIGIN', 'https://example.com'):
             owner = server.library.owner_key()
@@ -32,8 +60,10 @@ class WellbeingChecks(unittest.TestCase):
                 payload={'data':{'metrics':[{'name':'sleep_analysis','units':'hr','data':[
                     {'date':'2026-10-03','totalSleep':6.4,'core':4.1,'deep':1,'rem':1.3,'start':'2026-10-03 00:00:00 +0800'}]}]}}
                 self.assertEqual(request('/api/wellbeing')[0],401)
+                self.assertEqual(request('/api/health')[0],401)
+                self.assertEqual(request('/api/health',upload)[0],401)
                 self.assertEqual(request('/api/health/import','bad',payload)[0],401)
-                self.assertEqual(request('/api/health/import',upload,payload),(200,{'imported':1}))
+                self.assertEqual(request('/api/health/import',upload,payload),(200,{'imported':1,'changed':1}))
                 self.assertEqual(request('/api/health/import',upload,payload)[0],200)
                 self.assertEqual(request('/api/wellbeing',upload)[0],401)
                 self.assertEqual(request('/api/articles',upload)[0],401)

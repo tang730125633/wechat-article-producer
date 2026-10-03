@@ -73,3 +73,15 @@ zsh -n 打开公众号排版器.command
 - 同名关键词（Unicode NFC、忽略大小写）共享节点；所有连接来自保存的元数据，不做正则自动抽词或猜测因果。新灵感可由用户或 Agent 整理关键词。
 
 关键词也可独立于原话存在：`POST /api/keywords {"keyword":"词语"}` 保存到 `idea_keywords`，同名词按 NFC / 忽略大小写防重。`GET /api/ideas` 的 `keywords` 返回独立词库；前端将其与原话已有标签合并显示，并为未关联词绘制独立节点，不创建假的原句。
+
+## 自动睡眠同步
+
+`health_sync.py` 是一次执行即退出的同步程序：读取本机 Health Auto Export MCP 的最近七天睡眠，使用专用上传钥匙发送到工作台。仅传睡眠，不传其他指标；Mac 登录后的 launchd 每 15 分钟运行，并在同步目录变化时触发。Mac 休眠/离线会暂停，醒来后继续；iPhone 直传仍可作为不依赖 Mac 的通路，受 iOS 后台条件限制。
+
+- 私有配置 `~/.config/health-auto-export/workbench.json`（600）：`url` 与专用上传 `token`。MCP 请求头沿用同目录的 `mcp-headers.json`，不在命令或日志输出。
+- `POST /api/health/import` 支持 `sync_source`（manual / mac-bridge / iphone）与 `sync_interval`。只有内容变化才改写 sleep_days.received；每轮检查结果存在 health_sync，不伪造新睡眠。
+- `POST /api/health/sync` 记录 empty/error，允许同一上传钥匙调用；不会授予读取文章或健康数据权限。
+- `GET /api/health` 返回睡眠、感受、同步状态，不读取灵感/文章。页面可见时每分钟查询，切回页面立即查询；不自动打断原话、文章或关联编辑。
+- 同步状态区分最近检查、最近成功、内容实际变化、任务周期；超过预期 2.5 个周期（至少 30 分钟）未收到检查时显示延迟，历史数据保留。
+
+本机运行文件安装在 `~/.local/libexec/tang-health-sync/health_sync.py`，任务标签 `ai.zelong.health-sync`。日志在 `~/Library/Logs/tang-health-sync.log`，只记结果、数量和错误类别。程序退出码 0 代表本轮上报完成，不能单凭此证明手表已经生成当天数据。

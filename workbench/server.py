@@ -315,6 +315,8 @@ class Handler(SimpleHTTPRequestHandler):
             article_id = query.get("id", [""])[0]
             if parsed.path == "/api/wellbeing":
                 return self.send_json(200, wellbeing.snapshot())
+            if parsed.path == "/api/health":
+                return self.send_json(200, wellbeing.health_snapshot())
             if parsed.path == "/api/ideas":
                 return self.send_json(200, {"ideas": wellbeing.ideas(), "keywords": wellbeing.keywords()})
             if parsed.path == "/api/health/setup":
@@ -325,7 +327,7 @@ class Handler(SimpleHTTPRequestHandler):
                     "datatype": "healthMetrics", "metrics": "Sleep Analysis", "period": "none",
                     "aggregatedata": "true", "aggregatesleep": "true", "interval": "days",
                     "exportversion": "v2", "syncinterval": "hours", "syncquantity": "2",
-                    "headers": "Authorization,Bearer " + wellbeing.upload_key(), "enabled": "true"}
+                    "headers": "Authorization,Bearer " + wellbeing.upload_key() + ",X-Health-Source,iphone", "enabled": "true"}
                 return self.send_json(200, {"setup_url": "com.HealthExport://automation?" + urllib.parse.urlencode(params, quote_via=urllib.parse.quote), "endpoint": endpoint})
             if parsed.path == "/api/articles":
                 if not article_id:
@@ -345,13 +347,13 @@ class Handler(SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def do_POST(self):
-        if self.path not in {"/api/wechat/upload-image", "/api/wechat/draft", "/api/articles", "/api/session", "/api/health/import", "/api/checkin", "/api/notes", "/api/ideas", "/api/keywords"}:
+        if self.path not in {"/api/wechat/upload-image", "/api/wechat/draft", "/api/articles", "/api/session", "/api/health/import", "/api/health/sync", "/api/checkin", "/api/notes", "/api/ideas", "/api/keywords"}:
             return self.send_json(404, {"error": "接口不存在"})
         if self.headers.get("Content-Type", "").split(";", 1)[0] != "application/json":
             return self.send_json(415, {"error": "请求格式错误"})
         if not allowed_origin(self.headers.get("Origin", "")):
             return self.send_json(403, {"error": "请从工作台页面发起操作"})
-        health_upload = self.path == "/api/health/import" and wellbeing.upload_authorized(self.headers.get("Authorization", ""))
+        health_upload = self.path in {"/api/health/import", "/api/health/sync"} and wellbeing.upload_authorized(self.headers.get("Authorization", ""))
         if self.path != "/api/session" and not health_upload and not self.authenticated():
             return self.send_json(401, {"error": "请先登录自己的文章工作台"})
         try:
@@ -367,7 +369,11 @@ class Handler(SimpleHTTPRequestHandler):
             if self.path == "/api/health/import":
                 if not isinstance(body.get("data"), dict):
                     raise ValueError("睡眠数据格式错误")
+                if self.headers.get("X-Health-Source"):
+                    body["sync_source"] = self.headers["X-Health-Source"]
                 return self.send_json(200, wellbeing.import_sleep(body))
+            if self.path == "/api/health/sync":
+                return self.send_json(200, wellbeing.report_sync(body))
             if self.path == "/api/checkin":
                 return self.send_json(200, wellbeing.check_in(body))
             if self.path == "/api/notes":

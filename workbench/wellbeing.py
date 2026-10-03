@@ -26,6 +26,7 @@ def connect():
       CREATE TABLE IF NOT EXISTS notes(id TEXT PRIMARY KEY, kind TEXT NOT NULL, text TEXT NOT NULL, created REAL NOT NULL);
       CREATE TABLE IF NOT EXISTS idea_links(note_id TEXT PRIMARY KEY REFERENCES notes(id), metadata TEXT NOT NULL, revision INTEGER NOT NULL, updated REAL NOT NULL, updated_by TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS idea_keywords(key TEXT PRIMARY KEY, label TEXT NOT NULL, created REAL NOT NULL);
+      CREATE TABLE IF NOT EXISTS health_sync(source TEXT PRIMARY KEY, state TEXT NOT NULL);
     """)
     return db
 
@@ -46,7 +47,40 @@ def upload_authorized(header):
     return bool(token) and secrets.compare_digest(token, upload_key())
 
 
+def sync_identity(body):
+    source = body.get("sync_source", "manual")
+    interval = body.get("sync_interval", 900 if source == "mac-bridge" else 7200)
+    if source not in ("manual", "mac-bridge", "iphone") or isinstance(interval, bool) or not isinstance(interval, int) or not 60 <= interval <= 86400:
+        raise ValueError("同步来源或周期格式错误")
+    return source, interval
+
+
+def record_sync(db, source, interval, status, changed=0, latest_day=None, error=""):
+    old = db.execute("SELECT state FROM health_sync WHERE source=?", (source,)).fetchone()
+    state = json.loads(old[0]) if old else {}
+    now = time.time()
+    state.update(source=source, interval=interval, status=status, checked=now,
+                 runs=state.get("runs", 0) + 1, changed_count=changed, error=error)
+    if status == "ok":
+        state.update(success=now, latest_day=latest_day)
+    if changed:
+        state["changed"] = now
+    db.execute("INSERT INTO health_sync VALUES (?,?) ON CONFLICT(source) DO UPDATE SET state=excluded.state", (source, json.dumps(state)))
+
+
+def report_sync(body):
+    source, interval = sync_identity(body)
+    status, error = body.get("status"), body.get("error", "")
+    if status not in ("empty", "error") or error not in ("", "source_unavailable", "source_rejected", "invalid_source_data", "no_records"):
+        raise ValueError("同步状态格式错误")
+    with connect() as db:
+        db.execute("BEGIN IMMEDIATE")
+        record_sync(db, source, interval, status, error=error)
+    return {"recorded": True}
+
+
 def import_sleep(body):
+    source, interval = sync_identity(body)
     metrics = body.get("data", {}).get("metrics", [])
     if not isinstance(metrics, list):
         raise ValueError("睡眠数据格式错误")
@@ -76,17 +110,35 @@ def import_sleep(body):
             rows.append((day, json.dumps(record, ensure_ascii=False), time.time()))
     if not rows or len(rows) > 370:
         raise ValueError("需要 1 到 370 条按天汇总的睡眠记录")
+    changed = 0
     with connect() as db:
-        db.executemany("INSERT INTO sleep_days VALUES (?,?,?) ON CONFLICT(day) DO UPDATE SET summary=excluded.summary,received=excluded.received", rows)
-    return {"imported": len({r[0] for r in rows})}
+        db.execute("BEGIN IMMEDIATE")
+        for day, encoded, received in rows:
+            old = db.execute("SELECT summary FROM sleep_days WHERE day=?", (day,)).fetchone()
+            if old and json.loads(old[0]) == json.loads(encoded):
+                continue
+            db.execute("INSERT INTO sleep_days VALUES (?,?,?) ON CONFLICT(day) DO UPDATE SET summary=excluded.summary,received=excluded.received", (day, encoded, received))
+            changed += 1
+        record_sync(db, source, interval, "ok", changed, max(r[0] for r in rows))
+    return {"imported": len({r[0] for r in rows}), "changed": changed}
 
 
-def snapshot():
+def health_snapshot():
     with connect() as db:
         sleep = [{**json.loads(r["summary"]), "received": r["received"]} for r in db.execute("SELECT * FROM sleep_days ORDER BY day DESC LIMIT 30")]
         checkins = [dict(r) for r in db.execute("SELECT * FROM checkins ORDER BY day DESC LIMIT 30")]
+        sources = [json.loads(r[0]) for r in db.execute("SELECT state FROM health_sync")]
+    automatic = [s for s in sources if s["source"] != "manual"]
+    live = [s for s in automatic if time.time() - s["checked"] <= max(1800, s["interval"] * 2.5)]
+    status = "ok" if any(s["status"] == "ok" for s in live) else "error" if live else "delayed" if automatic else "unconfigured"
+    return {"today": today(), "sleep": sleep, "checkins": checkins, "sync": {"status": status, "sources": sources}}
+
+
+def snapshot():
+    result = health_snapshot()
+    with connect() as db:
         notes = [dict(r) for r in db.execute("SELECT * FROM notes ORDER BY created DESC LIMIT 60")]
-    return {"today": today(), "sleep": sleep, "checkins": checkins, "notes": notes}
+    return {**result, "notes": notes}
 
 
 def check_in(body):
