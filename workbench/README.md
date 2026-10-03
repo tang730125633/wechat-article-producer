@@ -50,3 +50,15 @@ zsh -n 打开公众号排版器.command
 ```
 
 `examples/` 中的 SVG 可以继续编辑，PNG 可直接作为公众号示例配图。
+
+## 生活与创作首页
+
+首页复用文章工作台与登录，新增奶油白/柔和绿的创作书桌。文字输入可保存为灵感，或保存原话并进入文章编辑器；浏览器支持时可使用语音输入，不支持时使用系统听写。当前不包含网页内模型改写或自动主动关怀。
+
+- `GET /api/wellbeing`：本人已同步睡眠、今日感受与最近灵感/回顾，需工作台授权。
+- `POST /api/health/import`：Health Auto Export 的 JSON 睡眠汇总；仅保留 sleep_analysis，重复日期更新。可使用私有 health-upload.key，只有此接口接受该钥匙。
+- `GET /api/health/setup`：本人登录后获取手机应用的同步配置链接。链接含专用上传凭据，不记录、不分享；只选 Sleep Analysis、按天汇总前一天与当天。
+- `POST /api/checkin`：`{"mood":"good|okay|tired"}`，按北京时间记录当日感受。
+- `POST /api/notes`：`{"id":"UUID","kind":"idea|reflection","text":"原话"}`，同一编号防重，不静默覆盖不同文本。
+
+健康与生活记录放在公开目录外的 `wellbeing.sqlite3`，与 `articles.sqlite3` 分开，不自动进入文章或微信草稿。手机持续自动同步需现场确认；本机读到后的一次性导入不等于手机自动同步。

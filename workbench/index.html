@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tang 公众号排版工作台</title>
+  <title>泽龙的书桌 · 创作与生活</title>
   <style>
     :root {
       color-scheme: light;
@@ -205,17 +205,42 @@
     }
   </style>
   <link rel="stylesheet" href="library.css">
+  <link rel="stylesheet" href="desk.css">
 </head>
 <body>
   <header class="worktop">
-    <div><strong>唐泽龙的公众号工作台</strong><span>把聊出来的想法，留下来</span></div>
-    <nav aria-label="工作区"><button id="showLibrary" type="button">文章库</button><button id="showEditor" type="button">编写与预览</button></nav>
-    <span id="cloudSaveStatus" role="status" aria-live="polite">正在连接文章库…</span>
-    <button id="saveArticle" type="button">保存文章</button>
+    <div class="desk-brand"><strong>泽龙的书桌</strong><span>写下生活，也照顾好自己</span></div>
+    <nav aria-label="工作区"><button id="showToday" type="button">今天</button><button id="showLibrary" type="button">文章</button><button id="showIdeas" type="button">灵感</button><button id="showHealth" type="button">身体</button><button id="showReview" type="button">回顾</button><button id="showEditor" type="button" hidden>当前文章</button></nav>
+    <div class="desk-signature"><span aria-hidden="true">☼</span> 好好生活，慢慢变好 <b>Tang</b></div>
+    <span id="cloudSaveStatus" role="status" aria-live="polite">正在连接你的书桌…</span><button id="saveArticle" type="button" hidden>保存文章</button>
   </header>
+    <form id="ownerLogin" hidden><p>输入工作台密码，即可继续查看和编辑自己的文章。</p><label for="loginCode">登录密码</label><input id="loginCode" type="password" autocomplete="current-password"><button type="submit">登录工作台</button></form>
+  <section id="deskPage" class="desk-page" hidden>
+    <section class="health-strip" aria-label="睡眠与今日感受">
+      <button class="sleep-overview" id="sleepDetails" type="button"><span id="sleepLabel">最近一晚睡眠</span><strong id="sleepTotal">—<small> 等待同步</small></strong></button>
+      <div id="sleepChart" class="sleep-chart" aria-label="近七天睡眠时长"></div>
+      <div class="feeling"><p>今天感觉怎么样？</p><div class="mood-options" aria-label="记录今日感受"><button type="button" data-mood="good" aria-pressed="false">☺ <span>有精神</span></button><button type="button" data-mood="okay" aria-pressed="false">◉ <span>一般</span></button><button type="button" data-mood="tired" aria-pressed="false">☾ <span>有点累</span></button></div></div>
+      <div class="sync-state"><span id="sleepSync">正在读取记录…</span><button type="button" id="connectSleep">连接手机睡眠</button></div>
+    </section>
+    <div id="todayDesk" class="desk-grid">
+      <section class="writing-desk">
+        <div class="desk-intro"><div><h1>今天，你想留下什么？</h1><p>哪怕只有一句话，也可以从这里开始。</p></div><span class="desk-aside-note">文字会陪你，<br>把思考变成礼物。<i aria-hidden="true">❧</i></span></div>
+        <form id="captureForm" class="capture-sheet"><label class="visually-hidden" for="ideaInput">写下你的想法</label><textarea id="ideaInput" maxlength="50000" placeholder="一句话也可以，剩下的和小秋一起整理。"></textarea><div class="capture-actions"><button id="voiceCapture" type="button" class="voice-button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg><span>说个想法</span></button><div class="capture-buttons"><button id="saveIdea" type="submit" class="quiet-button">先记下来</button><button id="startArticle" type="button" class="desk-primary">开始写这篇 <span aria-hidden="true">↗</span></button></div></div><p id="captureStatus" class="capture-status" role="status" aria-live="polite">文字会暂存在这台设备，点“先记下来”保存到书桌。</p></form>
+        <section class="ideas-preview"><div class="section-heading"><h2>那些没来得及说的想法</h2><button id="allIdeas" type="button">查看全部 →</button></div><div id="ideaCards" class="idea-cards"></div></section>
+      </section>
+      <aside class="desk-companion">
+        <section class="companion-card"><h2>小秋在这里</h2><p class="subtle">陪你思考，也陪你好好生活。</p><div class="companion-message"><img src="xiaoqiu.png" alt="小秋的插画头像" width="84" height="84"><p id="careQuestion">今天的你，感觉怎么样？<br>留一句话给自己吧。</p></div><button type="button" id="shareFeeling" class="text-button">说说今天的状态 ↗</button></section>
+        <section class="recent-card"><div class="section-heading"><h2>你最近在写</h2><button id="allArticles" type="button">查看全部 →</button></div><img id="recentCover" alt="当前文章封面" hidden><div id="recentEmpty" class="recent-empty">还没有开始的文章。<br>从左边的一句话开始吧。</div><h3 id="recentTitle"></h3><p id="recentDigest" class="subtle"></p><div class="recent-actions"><span id="recentState"></span><button id="continueArticle" type="button" class="desk-primary" hidden>继续这篇 →</button></div></section>
+        <button id="eveningReview" class="evening-card" type="button"><span class="moon-icon" aria-hidden="true">☾</span><span><strong>留一分钟，聊聊今天</strong><small>做了什么，卡在哪里，都可以留下。</small></span><span aria-hidden="true">↗</span></button>
+      </aside>
+    </div>
+    <section id="deskDetail" class="desk-detail" hidden><div class="section-heading"><div><h1 id="detailTitle"></h1><p id="detailIntro" class="subtle"></p></div><button id="backToday" type="button" class="quiet-button">回到今天</button></div><div id="detailContent"></div></section>
+    <footer class="desk-footer"><span>更好的自己，从记录开始。</span><span>你的想法，你的生活。</span></footer>
+  </section>
+  <dialog id="deskDialog"><form method="dialog"><button class="dialog-close" aria-label="关闭" value="close">×</button></form><div id="dialogContent"></div></dialog>
   <section id="libraryPage" class="library-page" hidden>
     <div class="library-heading"><div><h1>我的文章</h1><p>AI 帮你整理与制作，你在这里审阅、微调和确认。</p></div><button id="newArticle" type="button">＋ 新建文章</button></div>
-    <form id="ownerLogin" hidden><p>输入工作台密码，即可继续查看和编辑自己的文章。</p><label for="loginCode">登录密码</label><input id="loginCode" type="password" autocomplete="current-password"><button type="submit">登录工作台</button></form>
+
     <div class="library-filters"><input id="articleSearch" placeholder="搜索文章标题" aria-label="搜索文章标题"><select id="articleFilter" aria-label="筛选文章"><option value="active">工作台草稿</option><option value="wechat">已送微信</option><option value="archived">已归档</option><option value="all">全部文章</option></select><button id="refreshLibrary" type="button">刷新</button></div>
     <p id="libraryMessage" role="status"></p><div id="articleList" class="article-list"></div>
     <button id="recoverBrowserDraft" type="button" hidden>另存当前浏览器里的旧稿</button>
@@ -1304,5 +1329,6 @@
     if (!checks.every(Boolean)) statusText.textContent = '兼容结构需要检查';
   </script>
   <script src="library.js"></script>
+  <script src="desk.js"></script>
 </body>
 </html>

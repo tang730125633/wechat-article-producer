@@ -26,9 +26,12 @@
   }
 
   function switchView(edit) {
+    $('#deskPage').hidden = true;
     editor.hidden = !edit; tools.hidden = !edit; home.hidden = edit;
     $('#showEditor').disabled = !current;
+    $('#showEditor').hidden = !current;
     $('#saveArticle').hidden = !edit;
+    window.dispatchEvent(new CustomEvent('workbench-view', {detail:edit ? 'editor' : 'articles'}));
     window.scrollTo(0, 0);
   }
 
@@ -36,6 +39,7 @@
     status.textContent = error.message;
     if (error.status === 401) {
       signedIn = false; $('#ownerLogin').hidden = false;
+      window.dispatchEvent(new CustomEvent('workbench-signedout'));
       message.textContent = '登录后可查看自己的历史文章。其他访客看不到你的草稿。';
     }
   }
@@ -64,6 +68,7 @@
     if (!signedIn) return;
     items = (await request('/api/articles')).articles;
     drawList();
+    window.dispatchEvent(new CustomEvent('workbench-articles', {detail:items}));
   }
 
   async function historyList() {
@@ -171,12 +176,27 @@
     applyDocument({id:crypto.randomUUID(), revision:0, archived:false, document:document || {title:'未命名文章', markdown:'', theme:activeTheme, author:'唐泽龙', byline:'唐泽龙'}});
     history.replaceState(null, '', location.pathname + '?article=' + encodeURIComponent(current.id));
     dirty = true; generation++; await save('新建文章');
+    return current;
   }
+
+  window.workbench = {request, openArticle, create, get signedIn() {return signedIn;},
+    async go(view) {
+      if (dirty) await save();
+      if (view === 'articles') {switchView(false); await refresh();}
+      else {
+        editor.hidden = tools.hidden = home.hidden = true;
+        $('#deskPage').hidden = false; $('#saveArticle').hidden = true;
+        window.dispatchEvent(new CustomEvent('workbench-view', {detail:view}));
+      }
+      history.replaceState(null, '', location.pathname + (view === 'today' ? '' : '?view=' + view));
+      window.scrollTo(0, 0);
+    }
+  };
 
   $('#newArticle').addEventListener('click', () => create().catch(showError));
   $('#saveArticle').addEventListener('click', () => save().catch(showError));
-  $('#showLibrary').addEventListener('click', async () => {try {if(dirty) await save(); switchView(false); history.replaceState(null,'',location.pathname); await refresh();} catch(error){showError(error);} });
-  $('#showEditor').addEventListener('click', () => current && switchView(true));
+  $('#showLibrary').addEventListener('click', () => window.workbench.go('articles').catch(showError));
+  $('#showEditor').addEventListener('click', () => {if(current){switchView(true);history.replaceState(null,'',location.pathname+'?article='+encodeURIComponent(current.id));}});
   $('#refreshLibrary').addEventListener('click', () => refresh().catch(showError));
   $('#articleSearch').addEventListener('input', drawList); $('#articleFilter').addEventListener('change', drawList);
   $('#archiveArticle').addEventListener('click', async () => {try {current.archived = !current.archived; dirty = true; generation++; await save('归档状态调整'); switchView(false);} catch(error){showError(error);} });
@@ -204,6 +224,7 @@
     if (!signedIn) {status.textContent = '请登录自己的文章库'; return;}
     status.textContent = '文章库已连接';
     await refresh();
+    window.dispatchEvent(new CustomEvent('workbench-ready'));
     if (new URLSearchParams(location.search).get('recover') === '1' && recoverable?.markdown) {
       const oldId = localStorage.getItem('tang-active-article');
       const old = items.some(item => item.id === oldId) ? await request('/api/articles?id=' + encodeURIComponent(oldId)) : null;

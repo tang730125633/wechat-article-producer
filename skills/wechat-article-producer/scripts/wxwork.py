@@ -93,6 +93,8 @@ def checked_article(client, args):
 def run(args, client):
     if args.command == "status":
         return client.request("wechat/status")
+    if args.command == "wellbeing":
+        return client.request("wellbeing")
     if args.command == "list":
         items = client.request("articles")["articles"]
         return {"articles": [summary(client, {**x, "document": x}) for x in items
@@ -165,6 +167,7 @@ def main():
     parser.add_argument("--source", default="zelong/agent", help="版本记录署名")
     subs = parser.add_subparsers(dest="command", required=True)
     subs.add_parser("status", help="检查连接及工作台授权")
+    subs.add_parser("wellbeing", help="读取已同步的睡眠、感受和灵感；不会放进文章")
     p = subs.add_parser("list", help="列出文章，可搜索")
     p.add_argument("--search"); p.add_argument("--all", action="store_true")
     for command in ("get", "versions", "open"):

@@ -22,6 +22,7 @@ from http.cookies import SimpleCookie
 from pathlib import Path
 from threading import Lock
 import library
+import wellbeing
 
 
 ROOT = Path(__file__).resolve().parent
@@ -312,6 +313,18 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json(401, {"error": "请先登录自己的文章工作台"})
             query = urllib.parse.parse_qs(parsed.query)
             article_id = query.get("id", [""])[0]
+            if parsed.path == "/api/wellbeing":
+                return self.send_json(200, wellbeing.snapshot())
+            if parsed.path == "/api/health/setup":
+                if not PUBLIC_ORIGIN.startswith("https://"):
+                    return self.send_json(400, {"error": "请从线上工作台配置手机同步"})
+                endpoint = PUBLIC_ORIGIN + "/wechat/api/health/import"
+                params = {"name": "泽龙的睡眠工作台", "url": endpoint, "format": "json",
+                    "datatype": "healthMetrics", "metrics": "Sleep Analysis", "period": "none",
+                    "aggregatedata": "true", "aggregatesleep": "true", "interval": "days",
+                    "exportversion": "v2", "syncinterval": "hours", "syncquantity": "2",
+                    "headers": "Authorization,Bearer " + wellbeing.upload_key(), "enabled": "true"}
+                return self.send_json(200, {"setup_url": "com.HealthExport://automation?" + urllib.parse.urlencode(params, quote_via=urllib.parse.quote), "endpoint": endpoint})
             if parsed.path == "/api/articles":
                 if not article_id:
                     return self.send_json(200, {"articles": library.list_articles()})
@@ -325,18 +338,19 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json(200, {"versions": library.versions(article_id)})
             return self.send_json(404, {"error": "接口不存在"})
         # Source, credentials and database are never served by this process.
-        if parsed.path not in {"/", "/index.html", "/library.js", "/library.css", "/body-album.jpg"} and not parsed.path.startswith("/examples/"):
+        if parsed.path not in {"/", "/index.html", "/library.js", "/library.css", "/desk.js", "/desk.css", "/xiaoqiu.png", "/body-album.jpg"} and not parsed.path.startswith("/examples/"):
             return self.send_json(404, {"error": "文件不存在"})
         return super().do_GET()
 
     def do_POST(self):
-        if self.path not in {"/api/wechat/upload-image", "/api/wechat/draft", "/api/articles", "/api/session"}:
+        if self.path not in {"/api/wechat/upload-image", "/api/wechat/draft", "/api/articles", "/api/session", "/api/health/import", "/api/checkin", "/api/notes"}:
             return self.send_json(404, {"error": "接口不存在"})
         if self.headers.get("Content-Type", "").split(";", 1)[0] != "application/json":
             return self.send_json(415, {"error": "请求格式错误"})
         if not allowed_origin(self.headers.get("Origin", "")):
             return self.send_json(403, {"error": "请从工作台页面发起操作"})
-        if self.path != "/api/session" and not self.authenticated():
+        health_upload = self.path == "/api/health/import" and wellbeing.upload_authorized(self.headers.get("Authorization", ""))
+        if self.path != "/api/session" and not health_upload and not self.authenticated():
             return self.send_json(401, {"error": "请先登录自己的文章工作台"})
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -348,6 +362,14 @@ class Handler(SimpleHTTPRequestHandler):
             body = json.loads(self.rfile.read(length))
             if not isinstance(body, dict):
                 raise WeChatError("请求格式错误")
+            if self.path == "/api/health/import":
+                if not isinstance(body.get("data"), dict):
+                    raise ValueError("睡眠数据格式错误")
+                return self.send_json(200, wellbeing.import_sleep(body))
+            if self.path == "/api/checkin":
+                return self.send_json(200, wellbeing.check_in(body))
+            if self.path == "/api/notes":
+                return self.send_json(200, wellbeing.save_note(body))
             if self.path == "/api/session":
                 token = library.login(body.get("code", ""))
                 return self.send_json(200 if token else 401, {"ok": bool(token), "error": "" if token else "密码不正确，或一次性登录码已失效"}, cookie=token)
