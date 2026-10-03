@@ -76,7 +76,7 @@ zsh -n 打开公众号排版器.command
 
 ## 自动睡眠同步
 
-`health_sync.py` 是一次执行即退出的同步程序：读取本机 Health Auto Export MCP 的最近七天睡眠，使用专用上传钥匙发送到工作台。仅传睡眠，不传其他指标；Mac 登录后的 launchd 每 15 分钟运行，并在同步目录变化时触发。Mac 休眠/离线会暂停，醒来后继续；iPhone 直传仍可作为不依赖 Mac 的通路，受 iOS 后台条件限制。
+`health_sync.py` 是一次执行即退出的同步程序：读取本机 Health Auto Export MCP 的最近七天睡眠，使用专用上传钥匙发送到工作台。仅传睡眠，不传其他指标；Mac 登录后的 launchd 每 15 分钟运行，启动时立即检查一次。Mac 休眠/离线会暂停，醒来后继续；iPhone 直传仍可作为不依赖 Mac 的通路，受 iOS 后台条件限制。
 
 - 私有配置 `~/.config/health-auto-export/workbench.json`（600）：`url` 与专用上传 `token`。MCP 请求头沿用同目录的 `mcp-headers.json`，不在命令或日志输出。
 - `POST /api/health/import` 支持 `sync_source`（manual / mac-bridge / iphone）与 `sync_interval`。只有内容变化才改写 sleep_days.received；每轮检查结果存在 health_sync，不伪造新睡眠。
