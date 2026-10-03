@@ -11,15 +11,19 @@
     const state=root.ideaState||(root.ideaState={query:'',keyword:'',selected:'',positions:new Map(),zoom:1,pan:{x:0,y:0}});
     const requestId=Symbol();root.ideaRequest=requestId;
     root.replaceChildren(element('p','正在把灵感和关键词连起来…','subtle'));
-    let ideas;
-    try{ideas=(await window.workbench.request('/api/ideas')).ideas;}catch(error){root.replaceChildren(element('p',error.message,'idea-error'));return;}
+    let ideas=[],savedKeywords=[];
+    async function load(){const response=await window.workbench.request('/api/ideas');ideas=response.ideas;savedKeywords=response.keywords||[];}
+    try{await load();}catch(error){root.replaceChildren(element('p',error.message,'idea-error'));return;}
     if(root.ideaRequest!==requestId||!root.isConnected||document.querySelector('#deskDetail').hidden||!document.querySelector('#deskDetail').classList.contains('ideas-wide'))return;
     root.replaceChildren();
     const toolbar=element('div',undefined,'idea-toolbar');const search=element('input');search.type='search';search.placeholder='找一个词，或你说过的一句话…';search.setAttribute('aria-label','搜索灵感和关键词');search.value=state.query;
     const info=element('span','','subtle');const create=action('＋ 记个灵感',()=>editNew(),'desk-primary');toolbar.append(search,info,create);
     const layout=element('div',undefined,'ideas-layout'),left=element('section',undefined,'idea-originals'),side=element('aside',undefined,'ideas-side');left.setAttribute('aria-label','你的原话');
     const filter=element('div',undefined,'idea-filter'),cards=element('div',undefined,'idea-quote-list');left.append(filter,cards);
-    const tagsPanel=element('section',undefined,'keyword-panel'),tagsHead=element('div',undefined,'section-heading'),tags=element('div',undefined,'keyword-cloud');tagsHead.append(element('h2','从关键词开始'),action('看全部',()=>{state.keyword='';state.selected='';draw();},'text-button'));tagsPanel.append(tagsHead,element('p','点一个词，看看它和哪些原话连在一起。','subtle'),tags);
+    const tagsPanel=element('section',undefined,'keyword-panel'),tagsHead=element('div',undefined,'section-heading'),tags=element('div',undefined,'keyword-cloud');tagsHead.append(element('h2','从关键词开始'),action('看全部',()=>{state.keyword='';state.selected='';draw();},'text-button'));tagsPanel.append(tagsHead,element('p','先记一个词也可以，原话和关联以后再补。','subtle'));
+    const keywordForm=element('form',undefined,'keyword-capture'),keywordInput=element('input'),keywordSave=element('button','记下关键词','desk-primary'),keywordStatus=element('p','','keyword-status');
+    keywordInput.id='newKeyword';keywordInput.placeholder='输入关键词，按回车记下';keywordInput.setAttribute('aria-label','新增关键词');keywordInput.maxLength=40;keywordInput.required=true;keywordSave.type='submit';keywordStatus.setAttribute('role','status');keywordStatus.setAttribute('aria-live','polite');keywordForm.append(keywordInput,keywordSave);const keywordActions=element('div',undefined,'keyword-actions');tagsPanel.append(keywordForm,keywordStatus,tags,keywordActions);
+    keywordForm.onsubmit=async event=>{event.preventDefault();const value=keywordInput.value.trim();if(!value){keywordInput.focus();return;}keywordInput.readOnly=true;keywordSave.disabled=true;keywordStatus.textContent='正在记下…';try{const result=await window.workbench.request('/api/keywords',{keyword:value});await load();state.query=search.value='';state.keyword=result.key;state.selected='';keywordInput.value='';keywordStatus.textContent=`已记下「${result.label}」，现在或以后都可以关联原话。`;draw();}catch(error){keywordStatus.textContent=error.message+'，输入已保留。';}finally{keywordSave.disabled=false;keywordInput.readOnly=false;keywordInput.focus();}};
     const graphPanel=element('section',undefined,'idea-graph-panel'),graphHead=element('div',undefined,'section-heading'),graph=element('div',undefined,'idea-graph'),graphNote=element('p','','graph-note');graphHead.append(element('h2','灵感关系图'));graphPanel.append(graphHead,graph,graphNote);
     const detail=element('section',undefined,'idea-connection-detail');side.append(tagsPanel,graphPanel,detail);layout.append(left,side);root.append(toolbar,layout);
     let visible=[];
@@ -40,19 +44,27 @@
         const actions=element('div',undefined,'idea-quote-actions');actions.append(action('整理关联',()=>editLinks(item),'text-button'),action('接着这个想法写 →',async()=>{try{await onContinue(item);}catch(error){showError(error);}},'quiet-button'));
         card.append(label,quote,chips,origin,actions);cards.append(card);
       }
-      if(!filtered.length)cards.append(element('p',ideas.length?'没有匹配的原话，换个词试试。':'看见了什么、想到了谁，都可以从一句原话开始。','empty-ideas'));
-      const counts=new Map();for(const item of visible)for(const word of item.keywords){const k=key(word);const old=counts.get(k)||{label:word,count:0};old.count++;counts.set(k,old);}
-      tags.replaceChildren();for(const [k,v] of [...counts].sort((a,b)=>b[1].count-a[1].count)){const chip=action(v.label+' · '+v.count,()=>chooseKeyword(v.label),'keyword-chip');chip.setAttribute('aria-pressed',String(state.keyword===k));tags.append(chip);}if(!counts.size)tags.append(element('p','先为一条原话补几个关键词，它们就会在这里相遇。','subtle'));
+      if(!filtered.length)cards.append(element('p',state.keyword?'这个关键词已经留下了，想起相关的人、事或一句话时，再来补充就好。':ideas.length?'没有匹配的原话，换个词试试。':'看见了什么、想到了谁，都可以从一句原话开始。','empty-ideas'));
+      const counts=new Map(savedKeywords.filter(w=>!state.query||w.label.toLowerCase().includes(state.query.toLowerCase())).map(w=>[w.key,{label:w.label,count:0}]));for(const item of visible)for(const word of item.keywords){const k=key(word);const old=counts.get(k)||{label:word,count:0};old.count++;counts.set(k,old);}
+      tags.replaceChildren();for(const [k,v] of [...counts].sort((a,b)=>b[1].count-a[1].count)){const chip=action(v.label+' · '+(v.count||'待关联'),()=>chooseKeyword(v.label),'keyword-chip');chip.setAttribute('aria-pressed',String(state.keyword===k));tags.append(chip);}if(!counts.size)tags.append(element('p','在上方记下第一个关键词，它会出现在这里和图谱里。','subtle'));
+      keywordActions.replaceChildren();if(state.keyword){const word=counts.get(state.keyword)?.label||state.keyword;keywordActions.append(action('关联已有原话',()=>linkKeyword(word),'quiet-button'),action('给这个词补一句话',()=>editNew(word),'text-button'));}
       const selected=ideas.find(i=>i.id===state.selected);detail.replaceChildren();
       if(selected){detail.append(element('h2','这句话的来路与去向'));for(const [label,value] of [['当时看见 / 想起',selected.context],['提炼成关键词',selected.keywords.join(' · ')],['我说过的话',selected.text],['以后想做',selected.next_step]]){const block=element('div',undefined,'idea-chain-step');block.append(element('small',label),element('p',value||'还没有补充'));detail.append(block);}detail.append(sourceLink(selected),action('补充 / 修改关联',()=>editLinks(selected),'quiet-button'));}
+      else if(state.keyword){const word=counts.get(state.keyword)?.label||state.keyword;detail.append(element('h2','关键词 · '+word),element('p',`${filtered.length} 条关联原话。可以先存词，再慢慢找回记忆。`,'subtle'));}
       else detail.append(element('h2','让思考有迹可循'),element('p','原句是根，关键词是路标。共享一个词的想法会连起来；选中原句，还能找回当时的场景和未来想做的事。','subtle'));
       renderGraph(visible);
     }
     function showError(error){const dialog=document.querySelector('#deskDialog'),content=document.querySelector('#dialogContent');content.replaceChildren(element('h2','这一步暂时没有完成'),element('p',error.message));dialog.showModal();}
-    function editNew(){
-      const dialog=document.querySelector('#deskDialog'),content=document.querySelector('#dialogContent');content.replaceChildren(element('h2','先把想法留下来'),element('p','想到什么就记什么，关键词可以稍后和小秋一起整理。'));
+    function editNew(keyword=''){
+      const dialog=document.querySelector('#deskDialog'),content=document.querySelector('#dialogContent');content.replaceChildren(element('h2','先把想法留下来'),element('p',keyword?'这句原话会关联到「'+keyword+'」。':'想到什么就记什么，关键词可以稍后和小秋一起整理。'));
       const text=element('textarea');text.setAttribute('aria-label','新的灵感原话');text.maxLength=50000;const status=element('p','','dialog-status');const id=crypto.randomUUID();
-      const save=action('保存这句原话',async()=>{if(!text.value.trim()){text.focus();return;}save.disabled=true;text.readOnly=true;try{await window.workbench.request('/api/notes',{id,kind:'idea',text:text.value});ideas=(await window.workbench.request('/api/ideas')).ideas;state.query=search.value='';state.keyword='';state.selected=id;dialog.close();draw();}catch(error){status.textContent=error.message+'。文字已保留，请先核对保存结果。';}finally{save.disabled=false;text.readOnly=false;}},'desk-primary');const actions=element('div',undefined,'dialog-actions');actions.append(save);content.append(text,status,actions);dialog.showModal();text.focus();
+      const save=action(keyword?'保存并关联':'保存这句原话',async()=>{if(!text.value.trim()){text.focus();return;}save.disabled=true;text.readOnly=true;try{await window.workbench.request('/api/notes',{id,kind:'idea',text:text.value});if(keyword)await window.workbench.request('/api/ideas',{id,revision:0,keywords:[keyword],source:'zelong/网页整理'});await load();state.query=search.value='';state.keyword='';state.selected=id;dialog.close();draw();}catch(error){status.textContent=error.message+'。文字已保留，请先核对保存结果。';}finally{save.disabled=false;text.readOnly=false;}},'desk-primary');const actions=element('div',undefined,'dialog-actions');actions.append(save);content.append(text,status,actions);dialog.showModal();text.focus();
+    }
+    function linkKeyword(word){
+      const dialog=document.querySelector('#deskDialog'),content=document.querySelector('#dialogContent');content.replaceChildren(element('h2','把「'+word+'」连到原话'));
+      if(!ideas.length){content.append(element('p','还没有原话。先给这个词补一句话吧。'),action('写一句原话',()=>{dialog.close();editNew(word);},'desk-primary'));dialog.showModal();return;}
+      const select=element('select');select.setAttribute('aria-label','选择要关联的原话');select.append(new Option('选择一条原话…',''));for(const item of ideas)select.append(new Option(item.text.slice(0,80),item.id));const status=element('p','','dialog-status');
+      const save=action('保存这条关联',async()=>{const item=ideas.find(i=>i.id===select.value);if(!item){select.focus();status.textContent='请先选一条原话。';return;}save.disabled=true;select.disabled=true;try{const body={id:item.id,revision:item.revision,keywords:[...item.keywords],context:item.context,next_step:item.next_step,source_label:item.source_label,source_url:item.source_url,source:'zelong/网页整理'};if(!body.keywords.some(k=>key(k)===key(word)))body.keywords.push(word);await window.workbench.request('/api/ideas',body);await load();state.keyword=key(word);state.selected='';dialog.close();draw();}catch(error){status.textContent=error.message+'；选择已保留。';}finally{save.disabled=false;select.disabled=false;}},'desk-primary');content.append(element('p','原句和已有关键词都保留，只增加这一条连接。'),select,status,save);dialog.showModal();
     }
     function editLinks(item){
       const dialog=document.querySelector('#deskDialog'),content=document.querySelector('#dialogContent');content.replaceChildren(element('h2','把这句话连起来'),element('blockquote',item.text,'link-original'));
@@ -64,13 +76,14 @@
       try{const draft=JSON.parse(localStorage.getItem(cache)||'null');if(draft&&draft.revision===item.revision){for(const k in fields)fields[k].value=draft[k];status.textContent='已找回上次未保存的整理。原句保持不变。';}}catch(_){}
       form.oninput=()=>{try{localStorage.setItem(cache,JSON.stringify({revision:item.revision,...Object.fromEntries(Object.entries(fields).map(([k,v])=>[k,v.value]))}));}catch(_){}};
       const save=element('button','保存关联','desk-primary');save.type='submit';const actions=element('div',undefined,'dialog-actions');actions.append(save);form.append(status,actions);
-      form.onsubmit=async event=>{event.preventDefault();save.disabled=true;const body={id:item.id,revision:item.revision,source:'zelong/网页整理'};for(const name in fields)body[name]=name==='keywords'?fields[name].value.split(/[，,、;；\n]+/).map(s=>s.trim()).filter(Boolean):fields[name].value;Object.values(fields).forEach(f=>f.readOnly=true);try{await window.workbench.request('/api/ideas',body);try{localStorage.removeItem(cache);}catch(_){}ideas=(await window.workbench.request('/api/ideas')).ideas;state.selected=item.id;state.keyword='';dialog.close();draw();}catch(error){status.textContent=error.message+'；本次输入保留在这里。';}finally{save.disabled=false;Object.values(fields).forEach(f=>f.readOnly=false);}};
+      form.onsubmit=async event=>{event.preventDefault();save.disabled=true;const body={id:item.id,revision:item.revision,source:'zelong/网页整理'};for(const name in fields)body[name]=name==='keywords'?fields[name].value.split(/[，,、;；\n]+/).map(s=>s.trim()).filter(Boolean):fields[name].value;Object.values(fields).forEach(f=>f.readOnly=true);try{await window.workbench.request('/api/ideas',body);try{localStorage.removeItem(cache);}catch(_){}await load();state.selected=item.id;state.keyword='';dialog.close();draw();}catch(error){status.textContent=error.message+'；本次输入保留在这里。';}finally{save.disabled=false;Object.values(fields).forEach(f=>f.readOnly=false);}};
       content.append(form);dialog.showModal();fields.keywords.focus();
     }
     function renderGraph(items){
       graph.replaceChildren();const nodes=new Map(),edges=[];
       function add(id,label,type){if(!nodes.has(id)){const pos=state.positions.get(id);nodes.set(id,{id,label,type,x:pos?.x,y:pos?.y,degree:0});}return nodes.get(id);}
       function link(a,b){edges.push([a,b]);a.degree++;b.degree++;}
+      for(const word of savedKeywords){if(!state.query||word.label.toLowerCase().includes(state.query.toLowerCase()))add('k:'+word.key,word.label,'keyword');}
       for(const item of items){const quote=add('n:'+item.id,item.text.slice(0,12)+(item.text.length>12?'…':''),'quote');quote.noteId=item.id;
         for(const word of item.keywords)link(quote,add('k:'+key(word),word,'keyword'));
         if(item.source_label||item.source_url)link(quote,add('s:'+(item.source_url||item.source_label),item.source_label||'来源对话','source'));
@@ -80,7 +93,7 @@
       const all=[...nodes.values()];
       if(!all.length){graph.append(element('p','第一条灵感，会成为这里的第一个节点。','empty-graph'));graphNote.textContent='原句、关键词和来源，都会在这里连起来。';return;}
       const W=620,H=420,needsLayout=all.some(n=>n.x===undefined);
-      all.forEach((n,i)=>{if(n.x===undefined){const angle=i*2.39996,r=Math.sqrt((i+1)/all.length)*165;n.x=W/2+Math.cos(angle)*r*1.3;n.y=H/2+Math.sin(angle)*r;}});
+      all.forEach((n,i)=>{if(n.x===undefined){const angle=i*2.39996,r=all.length===1?0:Math.sqrt((i+1)/all.length)*165;n.x=W/2+Math.cos(angle)*r*1.3;n.y=H/2+Math.sin(angle)*r;}});
       // ponytail: pairwise layout fits a personal graph; use quadtree forces if thousands of nodes become slow.
       for(let turn=0;needsLayout&&turn<55;turn++){
         for(let i=0;i<all.length;i++)for(let j=i+1;j<all.length;j++){const a=all[i],b=all[j];let dx=a.x-b.x,dy=a.y-b.y;const d=Math.max(1,Math.hypot(dx,dy)),push=Math.min(12,3200/(d*d)+Math.max(0,83-d)*.16);if(!dx&&!dy){dx=1;dy=.5;}a.x+=dx/d*push;a.y+=dy/d*push;b.x-=dx/d*push;b.y-=dy/d*push;}

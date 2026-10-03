@@ -97,6 +97,8 @@ def run(args, client):
         return client.request("wellbeing")
     if args.command == "ideas":
         return client.request("ideas")
+    if args.command == "keyword":
+        return client.request("keywords", {"keyword": args.word})
     if args.command == "capture-idea":
         text = sys.stdin.read() if args.file == "-" else Path(args.file).read_text(encoding="utf-8")
         note_id = args.id or str(uuid.uuid4())
@@ -187,6 +189,8 @@ def main():
     subs.add_parser("status", help="检查连接及工作台授权")
     subs.add_parser("wellbeing", help="读取已同步的睡眠、感受和灵感；不会放进文章")
     subs.add_parser("ideas", help="读取完整灵感库、原句、关键词和来源")
+    p = subs.add_parser("keyword", help="只记一个关键词，无需先有原句")
+    p.add_argument("word")
     p = subs.add_parser("capture-idea", help="保留一条灵感原话，结果含编号；可再整理关联")
     p.add_argument("--file", required=True); p.add_argument("--id", help="同一次保存使用同一 UUID 防重")
     p = subs.add_parser("link-idea", help="整理关键词与关联，保留原句")

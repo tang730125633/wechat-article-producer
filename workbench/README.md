@@ -71,3 +71,5 @@ zsh -n 打开公众号排版器.command
 - `POST /api/ideas` 接收 `id`、关联 `revision`、`keywords`、`context`、`next_step`、`source_label`、`source_url`、`source`。未提供字段视为空，因此局部更新应先读取并合并；wxwork 客户端会保留未指定字段。
 - 关联单独存在 `idea_links` 表，原句不变。重复保存相同内容不增加版本，旧版本修改返回 409。
 - 同名关键词（Unicode NFC、忽略大小写）共享节点；所有连接来自保存的元数据，不做正则自动抽词或猜测因果。新灵感可由用户或 Agent 整理关键词。
+
+关键词也可独立于原话存在：`POST /api/keywords {"keyword":"词语"}` 保存到 `idea_keywords`，同名词按 NFC / 忽略大小写防重。`GET /api/ideas` 的 `keywords` 返回独立词库；前端将其与原话已有标签合并显示，并为未关联词绘制独立节点，不创建假的原句。

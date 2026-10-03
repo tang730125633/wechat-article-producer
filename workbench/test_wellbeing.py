@@ -39,6 +39,9 @@ class WellbeingChecks(unittest.TestCase):
                 self.assertEqual(request('/api/articles',upload)[0],401)
                 self.assertEqual(request('/api/health/setup',upload)[0],401)
                 self.assertEqual(request('/api/ideas',upload)[0],401)
+                self.assertEqual(request('/api/keywords',upload,{'keyword':'灵感'})[0],401)
+                self.assertEqual(request('/api/keywords',owner,{'keyword':'先有一个词'})[0],200)
+                self.assertEqual(request('/api/ideas',owner)[1]['keywords'][0]['label'],'先有一个词')
                 snapshot=request('/api/wellbeing',owner)[1]
                 self.assertEqual(len(snapshot['sleep']),1)
                 self.assertEqual(snapshot['sleep'][0]['totalSleep'],6.4)
@@ -76,6 +79,16 @@ class WellbeingChecks(unittest.TestCase):
             wellbeing.import_sleep({'data':{'metrics':[{'name':'heart_rate','units':'count/min','data':[{'value':'private'}]},
                 {'name':'sleep_analysis','units':'hr','data':[good]}]}})
             self.assertNotIn('private',json.dumps(wellbeing.snapshot()))
+
+    def test_keywords_can_exist_without_quotes_and_deduplicate(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(server.library,'DATA',Path(folder)):
+            first=wellbeing.save_keyword({'keyword':'  AI 创作  '})
+            again=wellbeing.save_keyword({'keyword':'ai 创作'})
+            self.assertEqual(first,again)
+            self.assertEqual(len(wellbeing.keywords()),1)
+            self.assertEqual(wellbeing.ideas(),[])
+            self.assertEqual(wellbeing.snapshot()['notes'],[])
+            with self.assertRaises(ValueError):wellbeing.save_keyword({'keyword':' '})
 
 
 if __name__=='__main__':

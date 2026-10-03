@@ -25,6 +25,7 @@ def connect():
       CREATE TABLE IF NOT EXISTS checkins(day TEXT PRIMARY KEY, mood TEXT NOT NULL, updated REAL NOT NULL);
       CREATE TABLE IF NOT EXISTS notes(id TEXT PRIMARY KEY, kind TEXT NOT NULL, text TEXT NOT NULL, created REAL NOT NULL);
       CREATE TABLE IF NOT EXISTS idea_links(note_id TEXT PRIMARY KEY REFERENCES notes(id), metadata TEXT NOT NULL, revision INTEGER NOT NULL, updated REAL NOT NULL, updated_by TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS idea_keywords(key TEXT PRIMARY KEY, label TEXT NOT NULL, created REAL NOT NULL);
     """)
     return db
 
@@ -124,6 +125,24 @@ def ideas():
              **json.loads(r["metadata"] or "{}")} for r in rows]
 
 
+def keyword_label(value):
+    if not isinstance(value, str) or not value.strip() or len(value.strip()) > 40:
+        raise ValueError("每个关键词需要 1 到 40 个字")
+    return unicodedata.normalize("NFC", value.strip())
+
+
+def keywords():
+    with connect() as db:
+        return [dict(row) for row in db.execute("SELECT * FROM idea_keywords ORDER BY created DESC")]
+
+
+def save_keyword(body):
+    label = keyword_label(body.get("keyword"))
+    with connect() as db:
+        db.execute("INSERT OR IGNORE INTO idea_keywords VALUES (?,?,?)", (label.lower(), label, time.time()))
+        return dict(db.execute("SELECT * FROM idea_keywords WHERE key=?", (label.lower(),)).fetchone())
+
+
 def save_idea_links(body):
     note_id, revision = body.get("id"), body.get("revision")
     if not isinstance(note_id, str) or isinstance(revision, bool) or not isinstance(revision, int) or revision < 0:
@@ -133,9 +152,7 @@ def save_idea_links(body):
         raise ValueError("关键词需为列表，最多 32 个")
     labels, seen = [], set()
     for word in keywords:
-        if not isinstance(word, str) or not word.strip() or len(word.strip()) > 40:
-            raise ValueError("每个关键词需要 1 到 40 个字")
-        label = unicodedata.normalize("NFC", word.strip())
+        label = keyword_label(word)
         if label.lower() not in seen:
             labels.append(label); seen.add(label.lower())
     metadata = {"keywords": labels}
