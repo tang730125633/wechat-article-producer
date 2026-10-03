@@ -7,6 +7,8 @@ import secrets
 import sqlite3
 import time
 import uuid
+import unicodedata
+import urllib.parse
 import library
 
 
@@ -22,6 +24,7 @@ def connect():
       CREATE TABLE IF NOT EXISTS sleep_days(day TEXT PRIMARY KEY, summary TEXT NOT NULL, received REAL NOT NULL);
       CREATE TABLE IF NOT EXISTS checkins(day TEXT PRIMARY KEY, mood TEXT NOT NULL, updated REAL NOT NULL);
       CREATE TABLE IF NOT EXISTS notes(id TEXT PRIMARY KEY, kind TEXT NOT NULL, text TEXT NOT NULL, created REAL NOT NULL);
+      CREATE TABLE IF NOT EXISTS idea_links(note_id TEXT PRIMARY KEY REFERENCES notes(id), metadata TEXT NOT NULL, revision INTEGER NOT NULL, updated REAL NOT NULL, updated_by TEXT NOT NULL);
     """)
     return db
 
@@ -110,3 +113,56 @@ def save_note(body):
         note = {"id": note_id, "kind": kind, "text": text.strip(), "created": time.time()}
         db.execute("INSERT INTO notes VALUES (:id,:kind,:text,:created)", note)
     return note
+
+
+def ideas():
+    with connect() as db:
+        rows = db.execute("SELECT n.*,i.metadata,i.revision,i.updated,i.updated_by FROM notes n LEFT JOIN idea_links i ON i.note_id=n.id WHERE n.kind='idea' ORDER BY n.created DESC").fetchall()
+    return [{"id": r["id"], "text": r["text"], "created": r["created"],
+             "revision": r["revision"] or 0, "updated": r["updated"], "updated_by": r["updated_by"],
+             "keywords": [], "context": "", "next_step": "", "source_label": "", "source_url": "",
+             **json.loads(r["metadata"] or "{}")} for r in rows]
+
+
+def save_idea_links(body):
+    note_id, revision = body.get("id"), body.get("revision")
+    if not isinstance(note_id, str) or isinstance(revision, bool) or not isinstance(revision, int) or revision < 0:
+        raise ValueError("请提供灵感编号和当前关联版本")
+    keywords = body.get("keywords", [])
+    if not isinstance(keywords, list) or len(keywords) > 32:
+        raise ValueError("关键词需为列表，最多 32 个")
+    labels, seen = [], set()
+    for word in keywords:
+        if not isinstance(word, str) or not word.strip() or len(word.strip()) > 40:
+            raise ValueError("每个关键词需要 1 到 40 个字")
+        label = unicodedata.normalize("NFC", word.strip())
+        if label.lower() not in seen:
+            labels.append(label); seen.add(label.lower())
+    metadata = {"keywords": labels}
+    for key, limit in (("context", 10000), ("next_step", 10000), ("source_label", 200), ("source_url", 2000)):
+        value = body.get(key, "")
+        if not isinstance(value, str) or len(value) > limit:
+            raise ValueError("关联说明格式错误或过长")
+        metadata[key] = value.strip()
+    if metadata["source_url"]:
+        parsed = urllib.parse.urlsplit(metadata["source_url"])
+        web = parsed.scheme in ("http", "https") and bool(parsed.hostname)
+        chat = parsed.scheme == "codex" and parsed.netloc == "threads" and len(parsed.path) > 1
+        if not (web or chat) or parsed.username or parsed.password:
+            raise ValueError("来源链接需要是网页地址或 Codex 会话链接")
+    source = body.get("source", "zelong/网页整理")
+    if not isinstance(source, str) or len(source) > 80:
+        raise ValueError("整理者格式错误")
+    encoded = json.dumps(metadata, ensure_ascii=False, sort_keys=True)
+    with connect() as db:
+        db.execute("BEGIN IMMEDIATE")
+        note = db.execute("SELECT kind FROM notes WHERE id=?", (note_id,)).fetchone()
+        if not note or note["kind"] != "idea":
+            raise ValueError("这条灵感不存在")
+        old = db.execute("SELECT * FROM idea_links WHERE note_id=?", (note_id,)).fetchone()
+        if old and old["metadata"] == encoded:
+            return {"id": note_id, "revision": old["revision"], **metadata}
+        if (old["revision"] if old else 0) != revision:
+            raise library.Conflict("这条灵感的关联已有更新，请重新读取，当前输入不要丢弃")
+        db.execute("INSERT INTO idea_links VALUES (?,?,?,?,?) ON CONFLICT(note_id) DO UPDATE SET metadata=excluded.metadata,revision=excluded.revision,updated=excluded.updated,updated_by=excluded.updated_by", (note_id, encoded, revision + 1, time.time(), source))
+    return {"id": note_id, "revision": revision + 1, **metadata}

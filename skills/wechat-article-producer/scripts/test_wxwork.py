@@ -12,6 +12,25 @@ import wxwork
 
 
 class ClientChecks(unittest.TestCase):
+    def test_idea_links_preserve_source_context_and_original(self):
+        client = wxwork.Client('https://example.com/wechat', 'test')
+        item = {'id':'a', 'revision':2, 'text':'原话不能改', 'keywords':['旧关键词'],
+                'context':'实际经历', 'next_step':'', 'source_label':'原始对话', 'source_url':'codex://threads/test'}
+        args = argparse.Namespace(command='link-idea', id='a', revision=2, keywords=['新关键词'],
+                context=None, next_step=None, source_label=None, source_url=None, source='zelong/test')
+        with patch.object(client, 'request', side_effect=[{'ideas':[item]}, {'revision':3}]) as request:
+            self.assertEqual(wxwork.run(args, client)['revision'],3)
+            body = request.call_args.args[1]
+            self.assertEqual(body['context'],item['context'])
+            self.assertEqual(body['source_url'],item['source_url'])
+            self.assertEqual(body['keywords'],['新关键词'])
+            self.assertNotIn('text',body)
+        args.revision=1
+        with patch.object(client,'request',return_value={'ideas':[item]}) as request:
+            with self.assertRaises(wxwork.Error):
+                wxwork.run(args,client)
+            self.assertEqual(request.call_count,1)
+
     def test_config_and_transport_boundaries(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'config.json'

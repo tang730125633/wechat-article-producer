@@ -62,3 +62,12 @@ zsh -n 打开公众号排版器.command
 - `POST /api/notes`：`{"id":"UUID","kind":"idea|reflection","text":"原话"}`，同一编号防重，不静默覆盖不同文本。
 
 健康与生活记录放在公开目录外的 `wellbeing.sqlite3`，与 `articles.sqlite3` 分开，不自动进入文章或微信草稿。手机持续自动同步需现场确认；本机读到后的一次性导入不等于手机自动同步。
+
+## 灵感关联
+
+灵感页采用左侧原句、右侧关键词和交互图谱。节点支持点击定位、关键词筛选、拖动和缩放；记忆背景与下一步为可选说明，来源可链接到网页或已核对的 Codex 会话。使用原生 SVG，不引入图数据库或图形库。
+
+- `GET /api/ideas` 返回全部 idea 原句与关联元数据，不受首页最近 60 条记录的限制。
+- `POST /api/ideas` 接收 `id`、关联 `revision`、`keywords`、`context`、`next_step`、`source_label`、`source_url`、`source`。未提供字段视为空，因此局部更新应先读取并合并；wxwork 客户端会保留未指定字段。
+- 关联单独存在 `idea_links` 表，原句不变。重复保存相同内容不增加版本，旧版本修改返回 409。
+- 同名关键词（Unicode NFC、忽略大小写）共享节点；所有连接来自保存的元数据，不做正则自动抽词或猜测因果。新灵感可由用户或 Agent 整理关键词。

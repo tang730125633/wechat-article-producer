@@ -95,6 +95,24 @@ def run(args, client):
         return client.request("wechat/status")
     if args.command == "wellbeing":
         return client.request("wellbeing")
+    if args.command == "ideas":
+        return client.request("ideas")
+    if args.command == "capture-idea":
+        text = sys.stdin.read() if args.file == "-" else Path(args.file).read_text(encoding="utf-8")
+        note_id = args.id or str(uuid.uuid4())
+        print(json.dumps({"saving_id": note_id}), file=sys.stderr)
+        return client.request("notes", {"id": note_id, "kind": "idea", "text": text})
+    if args.command == "link-idea":
+        item = next((x for x in client.request("ideas")["ideas"] if x["id"] == args.id), None)
+        if not item:
+            raise Error("这条灵感不存在")
+        if item["revision"] != args.revision:
+            raise Error("关联版本已有更新，请先读取并核对")
+        body = {key: item[key] for key in ("keywords", "context", "next_step", "source_label", "source_url")}
+        for key in body:
+            if getattr(args, key) is not None:
+                body[key] = getattr(args, key)
+        return client.request("ideas", {**body, "id": args.id, "revision": args.revision, "source": args.source})
     if args.command == "list":
         items = client.request("articles")["articles"]
         return {"articles": [summary(client, {**x, "document": x}) for x in items
@@ -168,6 +186,14 @@ def main():
     subs = parser.add_subparsers(dest="command", required=True)
     subs.add_parser("status", help="检查连接及工作台授权")
     subs.add_parser("wellbeing", help="读取已同步的睡眠、感受和灵感；不会放进文章")
+    subs.add_parser("ideas", help="读取完整灵感库、原句、关键词和来源")
+    p = subs.add_parser("capture-idea", help="保留一条灵感原话，结果含编号；可再整理关联")
+    p.add_argument("--file", required=True); p.add_argument("--id", help="同一次保存使用同一 UUID 防重")
+    p = subs.add_parser("link-idea", help="整理关键词与关联，保留原句")
+    p.add_argument("id"); p.add_argument("--revision", type=int, required=True)
+    p.add_argument("--keywords", nargs="*")
+    for field in ("context", "next-step", "source-label", "source-url"):
+        p.add_argument("--" + field)
     p = subs.add_parser("list", help="列出文章，可搜索")
     p.add_argument("--search"); p.add_argument("--all", action="store_true")
     for command in ("get", "versions", "open"):

@@ -72,7 +72,11 @@
   $('#shareFeeling').onclick=reflection;$('#eveningReview').onclick=reflection;
   function renderDetail(){
     if(!data||!['ideas','health','review'].includes(activeView))return;
-    const root=$('#detailContent');root.replaceChildren();$('#detailTitle').textContent={ideas:'灵感有了自己的位置',health:'身体的节奏',review:'慢慢留下，慢慢看见'}[activeView];$('#detailIntro').textContent={ideas:'不用立刻写完。这里的每一句，都可以在以后接着生长。',health:'看看真实记录，也听听自己的感受。',review:'你的每天，不只有完成了多少事情。'}[activeView];
+    const root=$('#detailContent');root.replaceChildren();$('#deskDetail').classList.toggle('ideas-wide',activeView==='ideas');$('#detailTitle').textContent={ideas:'灵感有了自己的连接',health:'身体的节奏',review:'慢慢留下，慢慢看见'}[activeView];$('#detailIntro').textContent={ideas:'从一个关键词，找回那句话、那段记忆，以及下一步想做的事。',health:'看看真实记录，也听听自己的感受。',review:'你的每天，不只有完成了多少事情。'}[activeView];
+    if(activeView==='ideas'){
+      window.renderIdeaLibrary(root,{onContinue:async item=>{if(input.value.trim()&&input.value.trim()!==item.text)await wb.request('/api/notes',{id:crypto.randomUUID(),kind:'idea',text:input.value.trim()});input.value=item.text;input.dispatchEvent(new Event('input'));await go('today');input.focus();}});
+      return;
+    }
     if(activeView==='health'){
       if(!data.sleep.length){root.append(node('p','还没有收到睡眠数据。点击上方“连接手机睡眠”，开始同步。','health-note'));return;}
       const table=node('table',undefined,'sleep-table'),head=node('thead'),tr=node('tr');['日期','总睡眠','核心','深度','REM'].forEach(t=>tr.append(node('th',t)));head.append(tr);const body=node('tbody');for(const s of data.sleep){const row=node('tr');[s.day,duration(s.totalSleep),duration(s.core),duration(s.deep),duration(s.rem)].forEach(t=>row.append(node('td',t)));body.append(row);}table.append(head,body);root.append(table,node('p','只显示已收到的记录。缺失日期不会记成零；睡眠分期来自手表估计，不用于诊断。','health-note'));return;

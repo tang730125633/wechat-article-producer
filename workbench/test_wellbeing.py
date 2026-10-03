@@ -38,6 +38,7 @@ class WellbeingChecks(unittest.TestCase):
                 self.assertEqual(request('/api/wellbeing',upload)[0],401)
                 self.assertEqual(request('/api/articles',upload)[0],401)
                 self.assertEqual(request('/api/health/setup',upload)[0],401)
+                self.assertEqual(request('/api/ideas',upload)[0],401)
                 snapshot=request('/api/wellbeing',owner)[1]
                 self.assertEqual(len(snapshot['sleep']),1)
                 self.assertEqual(snapshot['sleep'][0]['totalSleep'],6.4)
@@ -47,6 +48,17 @@ class WellbeingChecks(unittest.TestCase):
                 self.assertEqual(request('/api/notes',owner,note)[0],200)
                 self.assertEqual(request('/api/notes',owner,note)[0],200)
                 self.assertEqual(request('/api/notes',owner,{**note,'text':'不能覆盖'})[0],409)
+                self.assertEqual(request('/api/ideas','',{'id':note['id'],'revision':0,'keywords':['创作']})[0],401)
+                linked=request('/api/ideas',owner,{'id':note['id'],'revision':0,'keywords':['创作','创作','  长期迭代  '],
+                    'source_url':'codex://threads/example','context':'真实场景'})
+                self.assertEqual(linked[0],200)
+                self.assertEqual(linked[1]['keywords'],['创作','长期迭代'])
+                self.assertEqual(request('/api/ideas',owner,{'id':note['id'],'revision':0,'keywords':['过期修改']})[0],409)
+                self.assertEqual(request('/api/ideas',owner,{'id':note['id'],'revision':1,'keywords':['创作'],'source_url':'javascript:alert(1)'})[0],400)
+                idea=request('/api/ideas',owner)[1]['ideas'][0]
+                self.assertEqual(idea['text'],note['text'])
+                self.assertEqual(idea['revision'],1)
+                self.assertEqual(idea['context'],'真实场景')
                 snapshot=request('/api/wellbeing',owner)[1]
                 self.assertEqual(len(snapshot['notes']),1)
                 self.assertEqual(snapshot['checkins'][0]['mood'],'tired')

@@ -315,6 +315,8 @@ class Handler(SimpleHTTPRequestHandler):
             article_id = query.get("id", [""])[0]
             if parsed.path == "/api/wellbeing":
                 return self.send_json(200, wellbeing.snapshot())
+            if parsed.path == "/api/ideas":
+                return self.send_json(200, {"ideas": wellbeing.ideas()})
             if parsed.path == "/api/health/setup":
                 if not PUBLIC_ORIGIN.startswith("https://"):
                     return self.send_json(400, {"error": "请从线上工作台配置手机同步"})
@@ -338,12 +340,12 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json(200, {"versions": library.versions(article_id)})
             return self.send_json(404, {"error": "接口不存在"})
         # Source, credentials and database are never served by this process.
-        if parsed.path not in {"/", "/index.html", "/library.js", "/library.css", "/desk.js", "/desk.css", "/xiaoqiu.png", "/body-album.jpg"} and not parsed.path.startswith("/examples/"):
+        if parsed.path not in {"/", "/index.html", "/library.js", "/library.css", "/desk.js", "/desk.css", "/ideas.js", "/ideas.css", "/xiaoqiu.png", "/body-album.jpg"} and not parsed.path.startswith("/examples/"):
             return self.send_json(404, {"error": "文件不存在"})
         return super().do_GET()
 
     def do_POST(self):
-        if self.path not in {"/api/wechat/upload-image", "/api/wechat/draft", "/api/articles", "/api/session", "/api/health/import", "/api/checkin", "/api/notes"}:
+        if self.path not in {"/api/wechat/upload-image", "/api/wechat/draft", "/api/articles", "/api/session", "/api/health/import", "/api/checkin", "/api/notes", "/api/ideas"}:
             return self.send_json(404, {"error": "接口不存在"})
         if self.headers.get("Content-Type", "").split(";", 1)[0] != "application/json":
             return self.send_json(415, {"error": "请求格式错误"})
@@ -370,6 +372,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json(200, wellbeing.check_in(body))
             if self.path == "/api/notes":
                 return self.send_json(200, wellbeing.save_note(body))
+            if self.path == "/api/ideas":
+                return self.send_json(200, wellbeing.save_idea_links(body))
             if self.path == "/api/session":
                 token = library.login(body.get("code", ""))
                 return self.send_json(200 if token else 401, {"ok": bool(token), "error": "" if token else "密码不正确，或一次性登录码已失效"}, cookie=token)
