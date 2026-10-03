@@ -1,0 +1,21 @@
+[Unit]
+Description=Tang private WeChat article workbench
+After=network-online.target
+
+[Service]
+Type=simple
+User=tang-wechat
+Group=tang-wechat
+WorkingDirectory=/opt/tang-wechat/current
+Environment=WECHAT_WORKBENCH_PORT=8768
+Environment=WORKBENCH_DATA_DIR=/var/lib/tang-wechat
+Environment=WORKBENCH_PUBLIC_ORIGIN=https://zelong.vip
+Environment=WECHAT_CREDENTIAL_FILE=/var/lib/tang-wechat/wechat.json
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/tang-wechat/current/server.py serve
+Restart=on-failure
+RestartSec=3
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

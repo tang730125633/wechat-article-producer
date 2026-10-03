@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tang 公众号排版工作台</title>
+  <title>泽龙的书桌 · 创作与生活</title>
   <style>
     :root {
       color-scheme: light;
@@ -204,37 +204,81 @@
       .phone-top { display: none; }
     }
   </style>
+  <link rel="stylesheet" href="library.css">
+  <link rel="stylesheet" href="desk.css">
+  <link rel="stylesheet" href="ideas.css">
 </head>
 <body>
+  <header class="worktop">
+    <div class="desk-brand"><strong>泽龙的书桌</strong><span>写下生活，也照顾好自己</span></div>
+    <nav aria-label="工作区"><button id="showToday" type="button">今天</button><button id="showLibrary" type="button">文章</button><button id="showIdeas" type="button">灵感</button><button id="showHealth" type="button">身体</button><button id="showReview" type="button">回顾</button><button id="showEditor" type="button" hidden>当前文章</button></nav>
+    <div class="desk-signature"><span aria-hidden="true">☼</span> 好好生活，慢慢变好 <b>Tang</b></div>
+    <span id="cloudSaveStatus" role="status" aria-live="polite">正在连接你的书桌…</span><button id="saveArticle" type="button" hidden>保存文章</button>
+  </header>
+    <form id="ownerLogin" hidden><p>输入工作台密码，即可继续查看和编辑自己的文章。</p><label for="loginCode">登录密码</label><input id="loginCode" type="password" autocomplete="current-password"><button type="submit">登录工作台</button></form>
+  <section id="deskPage" class="desk-page" hidden>
+    <section class="health-strip" aria-label="睡眠与今日感受">
+      <button class="sleep-overview" id="sleepDetails" type="button"><span id="sleepLabel">最近一晚睡眠</span><strong id="sleepTotal">—<small> 等待同步</small></strong></button>
+      <div id="sleepChart" class="sleep-chart" aria-label="近七天睡眠时长"></div>
+      <div class="feeling"><p>今天感觉怎么样？</p><div class="mood-options" aria-label="记录今日感受"><button type="button" data-mood="good" aria-pressed="false">☺ <span>有精神</span></button><button type="button" data-mood="okay" aria-pressed="false">◉ <span>一般</span></button><button type="button" data-mood="tired" aria-pressed="false">☾ <span>有点累</span></button></div></div>
+      <div class="sync-state"><span id="sleepSync">正在读取记录…</span><button type="button" id="connectSleep">连接手机睡眠</button></div>
+    </section>
+    <div id="todayDesk" class="desk-grid">
+      <section class="writing-desk">
+        <div class="desk-intro"><div><h1>今天，你想留下什么？</h1><p>哪怕只有一句话，也可以从这里开始。</p></div><span class="desk-aside-note">文字会陪你，<br>把思考变成礼物。<i aria-hidden="true">❧</i></span></div>
+        <form id="captureForm" class="capture-sheet"><label class="visually-hidden" for="ideaInput">写下你的想法</label><textarea id="ideaInput" maxlength="50000" placeholder="一句话也可以，剩下的和小秋一起整理。"></textarea><div class="capture-actions"><button id="voiceCapture" type="button" class="voice-button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg><span>说个想法</span></button><div class="capture-buttons"><button id="saveIdea" type="submit" class="quiet-button">先记下来</button><button id="startArticle" type="button" class="desk-primary">开始写这篇 <span aria-hidden="true">↗</span></button></div></div><p id="captureStatus" class="capture-status" role="status" aria-live="polite">文字会暂存在这台设备，点“先记下来”保存到书桌。</p></form>
+        <section class="ideas-preview"><div class="section-heading"><h2>那些没来得及说的想法</h2><button id="allIdeas" type="button">查看全部 →</button></div><div id="ideaCards" class="idea-cards"></div></section>
+      </section>
+      <aside class="desk-companion">
+        <section class="companion-card"><h2>小秋在这里</h2><p class="subtle">陪你思考，也陪你好好生活。</p><div class="companion-message"><img src="xiaoqiu.png" alt="小秋的插画头像" width="84" height="84"><p id="careQuestion">今天的你，感觉怎么样？<br>留一句话给自己吧。</p></div><button type="button" id="shareFeeling" class="text-button">说说今天的状态 ↗</button></section>
+        <section class="recent-card"><div class="section-heading"><h2>你最近在写</h2><button id="allArticles" type="button">查看全部 →</button></div><img id="recentCover" alt="当前文章封面" hidden><div id="recentEmpty" class="recent-empty">还没有开始的文章。<br>从左边的一句话开始吧。</div><h3 id="recentTitle"></h3><p id="recentDigest" class="subtle"></p><div class="recent-actions"><span id="recentState"></span><button id="continueArticle" type="button" class="desk-primary" hidden>继续这篇 →</button></div></section>
+        <button id="eveningReview" class="evening-card" type="button"><span class="moon-icon" aria-hidden="true">☾</span><span><strong>留一分钟，聊聊今天</strong><small>做了什么，卡在哪里，都可以留下。</small></span><span aria-hidden="true">↗</span></button>
+      </aside>
+    </div>
+    <section id="deskDetail" class="desk-detail" hidden><div class="section-heading"><div><h1 id="detailTitle"></h1><p id="detailIntro" class="subtle"></p></div><button id="backToday" type="button" class="quiet-button">回到今天</button></div><div id="detailContent"></div></section>
+    <footer class="desk-footer"><span>更好的自己，从记录开始。</span><span>你的想法，你的生活。</span></footer>
+  </section>
+  <dialog id="deskDialog"><form method="dialog"><button class="dialog-close" aria-label="关闭" value="close">×</button></form><div id="dialogContent"></div></dialog>
+  <section id="libraryPage" class="library-page" hidden>
+    <div class="library-heading"><div><h1>我的文章</h1><p>AI 帮你整理与制作，你在这里审阅、微调和确认。</p></div><button id="newArticle" type="button">＋ 新建文章</button></div>
+
+    <div class="library-filters"><input id="articleSearch" placeholder="搜索文章标题" aria-label="搜索文章标题"><select id="articleFilter" aria-label="筛选文章"><option value="active">工作台草稿</option><option value="wechat">已送微信</option><option value="archived">已归档</option><option value="all">全部文章</option></select><button id="refreshLibrary" type="button">刷新</button></div>
+    <p id="libraryMessage" role="status"></p><div id="articleList" class="article-list"></div>
+    <button id="recoverBrowserDraft" type="button" hidden>另存当前浏览器里的旧稿</button>
+  </section>
+  <div id="articleTools" class="article-tools" hidden><span id="articleVersion"></span><details class="more-tools"><summary>历史与更多</summary><div class="more-tools-body"><select id="versionSelect" aria-label="历史版本"><option value="">历史版本</option></select><button id="restoreVersion" type="button">恢复所选版本</button><button id="archiveArticle" type="button">归档文章</button><button id="copyForPolish" type="button">复制正文给润色对话</button></div></details></div>
   <main class="shell">
     <aside class="panel">
-      <p class="eyebrow">TANG EDITORIAL · V2</p>
-      <h1>公众号排版工作台</h1>
-      <p class="intro">正文保持为真实文字。复制后粘贴到壹伴的“编辑源代码”或富文本编辑区，再做微信手机预览。</p>
+      <p class="eyebrow">EDIT & REVIEW</p>
+      <h1>把文章准备好</h1>
+      <p class="intro">先看预览，再微调内容。准备好了，送到微信草稿箱继续检查。</p>
+      <a class="mobile-preview-link" href="#readerPreview">查看封面与正文 ↓</a>
       <p class="status"><span class="dot" aria-hidden="true"></span><span id="statusText">正在检查兼容性…</span></p>
       <section class="composer" aria-label="文章输入区">
-        <p class="theme-title">1. 粘贴文章</p>
+        <h2 class="step-title"><span>1</span> 微调内容</h2>
         <label class="field-label" for="titleInput">文章标题</label>
         <input class="field" id="titleInput" value="我想用 AI，把创作这件事坚持下来">
         <label class="field-label" for="bylineInput">作者与日期</label>
         <input class="field" id="bylineInput" value="唐泽龙　2026年9月">
-        <label class="field-label" for="markdownInput">正文（支持 Markdown 或普通分段文字）</label>
-        <textarea class="editor" id="markdownInput" placeholder="把新文章直接粘贴到这里。空行会分段；## 是小标题；> 是引用；**文字** 会加粗。"></textarea>
-        <p class="theme-title">2. 插入小组件</p>
-        <div class="component-grid" aria-label="文章组件">
+        <label class="field-label" for="markdownInput">正文</label>
+        <textarea class="editor" id="markdownInput" placeholder="AI 整理的正文会出现在这里，你也可以直接修改。"></textarea>
+        <p class="field-label">在光标位置添加</p>
+        <div class="component-grid" aria-label="正文工具">
           <button class="component-button" type="button" data-component="heading">小标题</button>
           <button class="component-button" type="button" data-component="quote">引用</button>
-          <button class="component-button" type="button" data-component="highlight">金句卡</button>
-          <button class="component-button" type="button" data-component="flow">流程卡</button>
-          <button class="component-button" type="button" data-component="image">图片位</button>
-          <button class="component-button" type="button" data-component="divider">分隔符</button>
-          <button class="component-button" type="button" data-component="footer">结尾签名</button>
+          <button class="component-button" type="button" id="insertBodyImage">插入图片</button>
+          <button class="component-button" type="button" data-component="divider">分隔线</button>
+          <details class="more-components"><summary>更多</summary><div>
+            <button class="component-button" type="button" data-component="highlight">重点句</button>
+            <button class="component-button" type="button" data-component="flow">流程</button>
+            <button class="component-button" type="button" data-component="footer">结尾署名</button>
+          </div></details>
         </div>
-        <p class="composer-note">点击组件会插入可修改的文字。按 ⌘ Enter 也可以更新预览；图片刷新页面后需要重新粘贴。</p>
+        <p class="composer-note">修改会自动保存。改好后点“更新预览”；图片也可以直接粘贴到正文。</p>
         <p class="composer-note" id="wechatStatus">微信图片接口：正在检查…</p>
-        <button class="action" id="renderButton" type="button">生成 / 更新预览</button>
+        <button class="action" id="renderButton" type="button">更新右侧预览</button>
       </section>
-      <p class="theme-title">3. 选择排版主题</p>
+      <details class="editor-section"><summary><span>2</span> 调整排版 <small>可选</small></summary><p class="composer-note">选择喜欢的样式，右侧立即更新，正文不会改变。</p>
       <div class="themes" aria-label="选择文章主题">
         <button class="theme-card" type="button" data-theme="editorial" aria-pressed="true"><span class="theme-preview editorial"></span><span class="theme-name">墨绿编辑部</span></button>
         <button class="theme-card" type="button" data-theme="paper" aria-pressed="false"><span class="theme-preview paper"></span><span class="theme-name">暖纸手记</span></button>
@@ -248,20 +292,40 @@
         <button class="theme-card" type="button" data-theme="coffee" aria-pressed="false"><span class="theme-preview coffee"></span><span class="theme-name">咖啡书页</span></button>
         <button class="theme-card" type="button" data-theme="peach" aria-pressed="false"><span class="theme-preview peach"></span><span class="theme-name">桃气手帐</span></button>
       </div>
-      <div class="actions">
+      </details>
+
+      <section class="composer publish-section" aria-label="导入公众号草稿">
+        <h2 class="step-title"><span>3</span> 发送微信草稿</h2><p class="composer-note">封面在右侧统一设置。确认预览后，每次点击都会新建一份微信草稿。</p>
+        <div id="draftFields">
+          <label class="field-label" for="draftAuthor">公众号作者（不含日期）</label>
+          <input class="field" id="draftAuthor" placeholder="唐泽龙">
+          <label class="field-label" for="draftDigest">摘要（可选）</label>
+          <textarea class="editor" id="draftDigest" style="min-height:80px" placeholder="一句话介绍这篇文章"></textarea>
+
+
+        </div>
+        <p class="composer-note" id="draftResult" role="status" aria-live="polite">每次点击都会新建一份微信草稿，不覆盖旧稿，也不会正式发布。</p>
+        <button class="action" id="draftButton" type="button">导入公众号草稿</button>
+      </section>
+
+      <details class="export-tools"><summary>复制与下载</summary><div class="actions">
         <button class="action" id="copySourceButton" type="button">复制 HTML 源码（推荐）</button>
         <button class="action secondary" id="copyButton" type="button">复制公众号富文本</button>
         <button class="action secondary" id="downloadButton" type="button">下载 HTML</button>
       </div>
-      <ul class="meta">
-        <li>正文：16px / 1.9 行距</li>
-        <li>主色：墨绿；紫色仅作标记</li>
-        <li>推荐：关闭壹伴 MD，再粘贴源码</li>
-        <li>源码中的图片保留为插入位置</li>
-        <li>发布：本页不会自动保存或发表</li>
-      </ul>
+      </details>
     </aside>
 
+    <div class="preview-column" id="readerPreview">
+      <section class="cover-card" tabindex="0" aria-label="公众号封面预览，选中后可粘贴图片">
+        <div class="preview-label"><strong>封面图片</strong><div class="cover-buttons"><button id="chooseCover" type="button">选择图片</button><button id="pasteCover" type="button">粘贴图片 · ⌘V</button></div></div>
+        <input id="draftCover" type="file" accept="image/jpeg,image/png" hidden>
+        <img id="draftCoverPreview" alt="公众号文章封面" hidden>
+        <div id="coverPlaceholder">还没有封面<br>点击上方“选择图片”，或在这个区域按 ⌘V</div>
+        <div class="cover-feedback"><p id="coverStatus" role="status" aria-live="polite">选择或粘贴图片后，这里会显示结果。</p><p id="coverInfo"></p></div>
+        <div class="cover-card-text"><h2 id="coverCardTitle"></h2><p id="coverCardDigest"></p></div>
+      </section>
+      <p class="preview-label body-preview-label">正文预览 <span>这里显示读者看到的文章</span></p>
     <section class="phone" aria-label="公众号手机预览">
       <div class="phone-top"></div>
       <header class="native-header">
@@ -359,7 +423,9 @@
         </section>
       </div>
     </section>
+    </div>
   </main>
+  <input id="bodyImageInput" type="file" accept="image/png,image/jpeg" hidden>
   <input id="imageFileInput" type="file" accept="image/png,image/jpeg" hidden>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script>
@@ -373,6 +439,9 @@
     const wechatStatus = document.querySelector('#wechatStatus');
     const draftKey = 'tang-wechat-layout-draft-v1';
     const imageAssets = new Map();
+    const isPublicHost = !['127.0.0.1', 'localhost'].includes(location.hostname);
+    const apiPath = path => new URL(path.replace(/^\/api\//, 'api/'), location.href).href;
+    let canUseApi = !isPublicHost;
     let activeTheme = 'editorial';
     let selectedImageSlot = 0;
 
@@ -724,12 +793,23 @@
     }
 
     function saveEditorState() {
+      updateCoverPreview();
       localStorage.setItem(draftKey, JSON.stringify({
         title: titleInput.value,
         byline: bylineInput.value,
         markdown: markdownInput.value,
-        theme: activeTheme
+        theme: activeTheme,
+        author: document.querySelector('#draftAuthor').value,
+        digest: document.querySelector('#draftDigest').value
       }));
+      window.scheduleArticleSave?.();
+    }
+
+    function updateCoverPreview() {
+      const image = document.querySelector('#draftCoverPreview');
+      document.querySelector('#coverPlaceholder').hidden = !image.hidden;
+      document.querySelector('#coverCardTitle').textContent = titleInput.value.trim() || '文章标题';
+      document.querySelector('#coverCardDigest').textContent = document.querySelector('#draftDigest').value.trim() || '摘要会显示在这里';
     }
 
     function renderEditorArticle(showMessage = true) {
@@ -784,6 +864,7 @@
       reader.onload = () => {
         const source = String(reader.result);
         imageAssets.set(imageKey, { preview: source });
+        window.scheduleArticleSave?.();
         const section = [...article.querySelectorAll('[data-role="image"]')].find(item => item.dataset.imageKey === imageKey);
         const visual = section?.querySelector('[data-image-slot]');
         if (visual) {
@@ -803,6 +884,19 @@
       reader.readAsDataURL(file);
     }
 
+    document.querySelector('#insertBodyImage').addEventListener('click', () => {
+      const picker = document.querySelector('#bodyImageInput'); picker.value = ''; picker.click();
+    });
+    document.querySelector('#bodyImageInput').addEventListener('change', event => {
+      const file = event.target.files[0];
+      if (!file) return;
+      if (!['image/png', 'image/jpeg'].includes(file.type) || file.size >= 1024 * 1024) return showToast('请选择小于 1 MB 的 JPG 或 PNG 图片');
+      const key = `image-${crypto.randomUUID()}`;
+      markdownInput.setRangeText(`\n\n:::image ${key}\n${file.name.replace(/\.[^.]+$/, '')}\n:::\n\n`, markdownInput.selectionStart, markdownInput.selectionEnd, 'end');
+      renderEditorArticle(false);
+      putImageInSlot(file, key);
+    });
+
     async function imageAsDataUrl(image) {
       if (image.src.startsWith('data:')) return image.src;
       const response = await fetch(image.src);
@@ -817,6 +911,7 @@
     }
 
     async function uploadSlotToWechat(section, button) {
+      if (!canUseApi) return showToast('微信连接尚未就绪，请稍后重试');
       const image = section.querySelector('img');
       if (!image) return showToast('请先粘贴或选择一张图片');
       if (!confirm('将这张图片上传到当前配置的微信公众号？')) return;
@@ -825,7 +920,7 @@
       button.disabled = true;
       button.textContent = '正在上传…';
       try {
-        const response = await fetch('/api/wechat/upload-image', {
+        const response = await fetch(apiPath('/api/wechat/upload-image'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ data_url: await imageAsDataUrl(image) })
@@ -838,6 +933,7 @@
         liveImage.dataset.wechatSrc = result.url;
         imageAssets.set(imageKey, { preview: previewSource, wechat: result.url });
         prepareImageSlots();
+        window.scheduleArticleSave?.();
         showToast('图片已上传微信，正文地址已自动替换');
       } catch (error) {
         button.disabled = false;
@@ -881,10 +977,12 @@
 
     imageFileInput.addEventListener('change', () => putImageInSlot(imageFileInput.files[0], selectedImageSlot));
 
-    fetch('/api/wechat/status')
-      .then(response => response.json())
-      .then(result => { wechatStatus.textContent = `微信图片接口：${result.configured ? '已配置，可以上传' : '未配置，请先运行 python3 server.py configure'}`; })
-      .catch(() => { wechatStatus.textContent = '微信图片接口：服务未启动'; });
+    {
+      fetch(apiPath('/api/wechat/status'))
+        .then(response => response.json())
+        .then(result => { canUseApi = result.app === 'wechat-article-producer-workbench-v2'; wechatStatus.textContent = result.configured ? '微信连接已配置，导入前会检查接口可用性。' : '微信连接尚未配置，可先编写和保存文章。'; })
+        .catch(() => { wechatStatus.textContent = '微信连接暂不可用，文章仍可编辑。'; });
+    }
 
     document.querySelector('#renderButton').addEventListener('click', () => renderEditorArticle());
     markdownInput.addEventListener('keydown', event => {
@@ -1049,6 +1147,138 @@
       }
     });
 
+    const draftButton = document.querySelector('#draftButton');
+    const draftResult = document.querySelector('#draftResult');
+    const draftCover = document.querySelector('#draftCover');
+    let coverDataUrl = '';
+    let importBusy = false;
+    function fileDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('图片读取失败，请重新选择'));
+        reader.readAsDataURL(file);
+      });
+    }
+    let coverGeneration = 0;
+    let coverPending = Promise.resolve();
+    let coverMeta = {};
+    let confirmedCover = '';
+    let coverError = '';
+    function coverMessage(text, error = false) {
+      const status = document.querySelector('#coverStatus');
+      status.textContent = text;
+      status.dataset.error = String(error);
+    }
+    function coverInfo() {
+      const image = document.querySelector('#draftCoverPreview');
+      document.querySelector('#coverInfo').textContent = coverDataUrl
+        ? `${coverMeta.name || '当前封面'} · ${coverMeta.width || image.naturalWidth} × ${coverMeta.height || image.naturalHeight}` : '';
+    }
+    window.loadSavedCover = (source, meta) => {
+      ++coverGeneration; coverPending = Promise.resolve(); coverError = '';
+      coverDataUrl = source || ''; confirmedCover = coverDataUrl; coverMeta = meta || {};
+      const preview = document.querySelector('#draftCoverPreview');
+      preview.src = coverDataUrl; preview.hidden = !coverDataUrl; draftCover.value = '';
+      updateCoverPreview();
+      coverMessage(coverDataUrl ? '当前封面 · 已保存到网站' : '选择图片，或在这个区域按 ⌘V 粘贴。');
+      const turn = coverGeneration;
+      if (coverDataUrl) preview.decode().then(() => { if (turn === coverGeneration) coverInfo(); }).catch(() => { if (turn === coverGeneration) coverMessage('封面图片无法显示，请在这里重新选择。', true); });
+      else coverInfo();
+    };
+    window.coverSaved = source => {
+      confirmedCover = source || '';
+      if (coverDataUrl && source === coverDataUrl && !coverError) coverMessage('封面已更新 · 已保存到网站');
+    };
+    window.coverSaveFailed = message => {
+      if (coverDataUrl !== confirmedCover) coverMessage('新封面尚未保存：' + message, true);
+    };
+    function setCoverImage(file, turn = ++coverGeneration) {
+      if (!file) return Promise.resolve();
+      coverError = '';
+      const articleId = new URLSearchParams(location.search).get('article');
+      const job = (async () => {
+        try {
+          if (!['image/png', 'image/jpeg'].includes(file.type)) throw new Error('请选择 JPG 或 PNG 图片，原封面未改动。');
+          if (file.size >= 1024 * 1024) throw new Error(`这张图为 ${(file.size / 1024 / 1024).toFixed(1)} MB，微信封面需小于 1 MB；原封面未改动。`);
+          coverMessage('正在读取新图片…');
+          const source = await fileDataUrl(file);
+          const decoded = new Image(); decoded.src = source; await decoded.decode();
+          if (turn !== coverGeneration) return;
+          if (articleId !== new URLSearchParams(location.search).get('article')) { coverMessage('文章已切换，请在当前文章重新选择封面。'); return; }
+          coverDataUrl = source;
+          coverMeta = {name:file.name || '粘贴的图片', width:decoded.naturalWidth, height:decoded.naturalHeight, updated_at:Date.now()};
+          const preview = document.querySelector('#draftCoverPreview');
+          preview.src = source; preview.hidden = false;
+          updateCoverPreview(); coverInfo();
+          coverMessage('新封面已显示 · 正在保存…');
+          window.scheduleArticleSave?.();
+        } catch (error) {
+          if (turn !== coverGeneration) return;
+          coverError = error.name === 'EncodingError' ? '这张图片无法读取，原封面未改动。请换一张 JPG 或 PNG 图片。' : error.message;
+          coverMessage(coverError, true);
+        }
+      })();
+      coverPending = job;
+      return job;
+    }
+    document.querySelector('#chooseCover').addEventListener('click', () => { draftCover.value = ''; draftCover.click(); });
+    draftCover.addEventListener('change', () => { const file = draftCover.files[0]; draftCover.value = ''; setCoverImage(file); });
+    document.querySelector('#pasteCover').addEventListener('click', () => {
+      document.querySelector('#pasteCover').focus();
+      coverMessage('现在按 ⌘V（Windows 按 Ctrl+V），新图片会显示在这里。');
+    });
+    document.querySelector('.cover-card').addEventListener('paste', event => {
+      const image = [...(event.clipboardData?.items || [])].find(item => item.type.startsWith('image/'));
+      if (!image) { coverMessage('剪贴板里没有图片，请先复制图片本身。', true); return; }
+      event.preventDefault(); event.stopPropagation();
+      setCoverImage(image.getAsFile());
+    });
+    document.querySelectorAll('#draftAuthor, #draftDigest').forEach(input => input.addEventListener('input', saveEditorState));
+    async function postWechat(path, body) {
+      const response = await fetch(apiPath(path), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || '微信请求失败');
+      return result;
+    }
+    draftButton.addEventListener('click', async () => {
+      if (importBusy) return;
+      await coverPending;
+      if (importBusy) return;
+      if (coverError) { draftResult.textContent = '封面尚未准备好，请查看右侧封面区的提示。'; return; }
+      if (!canUseApi) { draftResult.textContent = '微信连接尚未就绪，请稍后重试'; return; }
+      if (!titleInput.value.trim() || !markdownInput.value.trim()) { draftResult.textContent = '请先填写标题和正文'; return; }
+      if (!coverDataUrl) { draftResult.textContent = '请先选择封面图片'; draftCover.focus(); return; }
+      importBusy = true;
+      const requestId = crypto.randomUUID();
+      draftButton.disabled = true;
+      draftResult.textContent = '正在准备正文和封面…';
+      let creatingDraft = false;
+      try {
+        await window.saveCurrentArticle?.();
+        renderEditorArticle(false);
+        if (article.querySelector('.image-slot')) throw new Error('正文还有空图片位，请添加图片或删去空图片位');
+        const values = { title: titleInput.value.trim(), author: document.querySelector('#draftAuthor').value.trim(), digest: document.querySelector('#draftDigest').value.trim(), cover_data_url: coverDataUrl };
+        const clone = await cloneWithInlineImages();
+        for (const image of clone.querySelectorAll('img')) {
+          if (!wechatImageUrl(image)) {
+            const uploaded = await postWechat('/api/wechat/upload-image', { data_url: image.src });
+            image.src = uploaded.url;
+          }
+        }
+        draftResult.textContent = '正在保存到公众号草稿箱…';
+        creatingDraft = true;
+        const result = await postWechat('/api/wechat/draft', {
+          ...values, content: clone.outerHTML, article_id: new URLSearchParams(location.search).get('article') || '', request_id: requestId
+        });
+        draftResult.textContent = result.verified ? '已新建一份微信草稿并读回核对。再次点击会再建一份，旧稿保持不变。' : '微信已新建一份草稿，暂未完成读回核对。再次点击会另外新建，不覆盖这一份。';
+        draftButton.textContent = '再次导入一份';
+        await window.recordWechatReceipt?.(result);
+      } catch (error) {
+        draftResult.textContent = error instanceof TypeError && creatingDraft ? '连接中断，草稿结果暂不确定。请先查看草稿箱，勿立即重复导入。' : error.message;
+      } finally { importBusy = false; draftButton.disabled = false; }
+    });
+
     try {
       const savedDraft = JSON.parse(localStorage.getItem(draftKey) || 'null');
       if (savedDraft) {
@@ -1056,11 +1286,28 @@
         bylineInput.value = savedDraft.byline || bylineInput.value;
         markdownInput.value = savedDraft.markdown || '';
         activeTheme = themes[savedDraft.theme] ? savedDraft.theme : activeTheme;
+        document.querySelector('#draftAuthor').value = savedDraft.author || '';
+        document.querySelector('#draftDigest').value = savedDraft.digest || '';
       }
     } catch (error) {
       console.warn('本地草稿无法读取，已使用默认内容', error);
     }
 
+    if (!isPublicHost && location.hash.startsWith('#import=')) {
+      try {
+        const incoming = JSON.parse(decodeURIComponent(location.hash.slice(8)));
+        if (typeof incoming.markdown !== 'string' || typeof incoming.title !== 'string') throw new Error('文章格式错误');
+        if (!markdownInput.value || confirm('将带入的文章显示在本机工作台？现有文字会先备份在本机浏览器中。')) {
+          localStorage.setItem(draftKey + '-before-import', localStorage.getItem(draftKey) || 'null');
+          titleInput.value = incoming.title; bylineInput.value = incoming.byline || '';
+          markdownInput.value = incoming.markdown; activeTheme = themes[incoming.theme] ? incoming.theme : activeTheme;
+          document.querySelector('#draftAuthor').value = incoming.author || '';
+          document.querySelector('#draftDigest').value = incoming.digest || '';
+          saveEditorState();
+        }
+        history.replaceState(null, '', location.pathname + location.search);
+      } catch (error) { draftResult.textContent = '带入失败：' + error.message; }
+    }
     if (!renderEditorArticle(false)) applyTheme(activeTheme);
 
     const parserCheck = document.createElement('div');
@@ -1082,5 +1329,8 @@
     console.assert(checks.every(Boolean), '公众号正文结构检查失败');
     if (!checks.every(Boolean)) statusText.textContent = '兼容结构需要检查';
   </script>
+  <script src="library.js"></script>
+  <script src="ideas.js"></script>
+  <script src="desk.js"></script>
 </body>
 </html>
