@@ -76,12 +76,18 @@ zsh -n 打开公众号排版器.command
 
 ## 自动睡眠同步
 
-`health_sync.py` 是一次执行即退出的同步程序：读取本机 Health Auto Export MCP 的最近七天睡眠，使用专用上传钥匙发送到工作台。仅传睡眠，不传其他指标；Mac 登录后的 launchd 每 15 分钟运行，启动时立即检查一次。Mac 休眠/离线会暂停，醒来后继续；iPhone 直传仍可作为不依赖 Mac 的通路，受 iOS 后台条件限制。
+`health_sync.py` 是一次执行即退出的同步程序：直接读取 iCloud 已同步到本机的最近七天睡眠文件，使用专用上传钥匙发送到工作台。仅传睡眠，不传其他指标；Mac 登录后的 launchd 每 15 分钟运行，启动时立即检查一次。Mac 休眠/离线会暂停，醒来后继续；iPhone 直传仍可作为不依赖 Mac 的通路，受 iOS 后台条件限制。
 
-- 私有配置 `~/.config/health-auto-export/workbench.json`（600）：`url` 与专用上传 `token`。MCP 请求头沿用同目录的 `mcp-headers.json`，不在命令或日志输出。
+- 私有配置 `~/.config/health-auto-export/workbench.json`（600）：`url` 与专用上传 `token`。同步不再依赖 MCP 请求头或健康应用的数据接口；授权上传钥匙不在命令或日志输出。
 - `POST /api/health/import` 支持 `sync_source`（manual / mac-bridge / iphone）与 `sync_interval`。只有内容变化才改写 sleep_days.received；每轮检查结果存在 health_sync，不伪造新睡眠。
 - `POST /api/health/sync` 记录 empty/error，允许同一上传钥匙调用；不会授予读取文章或健康数据权限。
 - `GET /api/health` 返回睡眠、感受、同步状态，不读取灵感/文章。页面可见时每分钟查询，切回页面立即查询；不自动打断原话、文章或关联编辑。
 - 同步状态区分最近检查、最近成功、内容实际变化、任务周期；超过预期 2.5 个周期（至少 30 分钟）未收到检查时显示延迟，历史数据保留。
 
 本机运行文件安装在 `~/.local/libexec/tang-health-sync/health_sync.py`，任务标签 `ai.zelong.health-sync`。日志在 `~/Library/Logs/tang-health-sync.log`，只记结果、数量和错误类别。程序退出码 0 代表本轮上报完成，不能单凭此证明手表已经生成当天数据。
+
+### 应用重启后的恢复修复
+
+Mac 版应用重新启动不会自动恢复内部 MCP 端口。因此同步程序改为读取官方 Sync to Mac 路径下的 `sleep_analysis/yyyyMMdd.hae`，使用 macOS 自带 Compression 库解开 LZFSE，再对当前已验证的 Health Auto Export 4.x 睡眠片段格式做日期、单位、时长及重叠校验。仅合计睡眠，清醒片段不计入；忽略 iCloud 的带编号冲突副本。未知格式或冲突片段报错，不当成空数据或零睡眠。
+
+这条路径不启动、关闭或控制健康应用，MCP 端口关闭也能同步。仍依赖 iPhone → iCloud 文件同步、Mac 在线及文件已下载；文件来自用户已有授权导出，不修改原文件。默认目录可用 `--source-dir` 指定。

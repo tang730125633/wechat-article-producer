@@ -9,7 +9,6 @@ from pathlib import Path
 from unittest.mock import patch
 import server
 import wellbeing
-import health_sync
 
 
 class WellbeingChecks(unittest.TestCase):
@@ -32,13 +31,6 @@ class WellbeingChecks(unittest.TestCase):
             with patch('wellbeing.time.time',return_value=10000):
                 self.assertEqual(wellbeing.health_snapshot()['sync']['status'],'delayed')
                 self.assertEqual(wellbeing.health_snapshot()['sleep'][0]['totalSleep'],6.4)
-
-    def test_bridge_only_transfers_sleep_and_surfaces_source_failure(self):
-        raw={'data':{'metrics':[{'name':'heart_rate','data':[{'private':'not exported'}]},
-                              {'name':'sleep_analysis','data':[{'totalSleep':6.4}]}]}}
-        parsed=health_sync.sleep_payload({'result':{'content':[{'type':'text','text':json.dumps(raw)}]}})
-        self.assertEqual([m['name'] for m in parsed['data']['metrics']],['sleep_analysis'])
-        with self.assertRaises(health_sync.SyncError):health_sync.sleep_payload({'result':{'isError':True}})
 
     def test_private_routes_upload_scope_and_roundtrip(self):
         with tempfile.TemporaryDirectory() as folder, patch.object(server.library, 'DATA', Path(folder)), patch.object(server, 'PUBLIC_ORIGIN', 'https://example.com'):
