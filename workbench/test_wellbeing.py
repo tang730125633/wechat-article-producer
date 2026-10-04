@@ -13,6 +13,22 @@ import wellbeing
 
 
 class WellbeingChecks(unittest.TestCase):
+    def test_workout_success_cannot_hide_stale_or_failed_health_metrics(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(server.library,'DATA',Path(folder)):
+            metrics={'sync_source':'iphone','data':{'metrics':[{'name':'sleep_analysis','units':'hr',
+                'data':[{'date':'2026-10-03','totalSleep':6.4}]}]}}
+            workouts={'sync_source':'iphone-workouts','data':{'workouts':[]}}
+            with patch('wellbeing.time.time',return_value=1000):
+                wellbeing.import_sleep(metrics)
+                wellbeing.import_sleep(workouts)
+                wellbeing.report_sync({'sync_source':'iphone','status':'error','error':'source_unavailable'})
+                self.assertEqual(wellbeing.health_snapshot()['sync']['status'],'error')
+            with patch('wellbeing.time.time',return_value=10000):
+                wellbeing.import_sleep(workouts)
+                self.assertEqual(wellbeing.health_snapshot()['sync']['status'],'delayed')
+                wellbeing.import_sleep(metrics)
+                self.assertEqual(wellbeing.health_snapshot()['sync']['status'],'ok')
+
     def test_automatic_check_is_not_a_fake_data_change_and_failures_remain_visible(self):
         with tempfile.TemporaryDirectory() as folder, patch.object(server.library,'DATA',Path(folder)):
             payload={'sync_source':'mac-bridge','sync_interval':900,'data':{'metrics':[

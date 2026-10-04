@@ -74,9 +74,9 @@ zsh -n 打开公众号排版器.command
 
 关键词也可独立于原话存在：`POST /api/keywords {"keyword":"词语"}` 保存到 `idea_keywords`，同名词按 NFC / 忽略大小写防重。`GET /api/ideas` 的 `keywords` 返回独立词库；前端将其与原话已有标签合并显示，并为未关联词绘制独立节点，不创建假的原句。
 
-## 自动睡眠同步
+## 旧 Mac 睡眠中转（已停用，保留恢复工具）
 
-`health_sync.py` 是一次执行即退出的同步程序：直接读取 iCloud 已同步到本机的最近七天睡眠文件，使用专用上传钥匙发送到工作台。仅传睡眠，不传其他指标；Mac 登录后的 launchd 每 15 分钟运行，启动时立即检查一次。Mac 休眠/离线会暂停，醒来后继续；iPhone 直传仍可作为不依赖 Mac 的通路，受 iOS 后台条件限制。
+`health_sync.py` 是保留的故障恢复程序：直接读取 iCloud 已同步到本机的最近七天睡眠文件，使用专用上传钥匙发送到工作台。仅传睡眠，不传其他指标。现场已在手机直传成功后卸载 launchd 任务，并将启动文件移出 LaunchAgents 留存；不再依赖 Mac 中转。以下说明只用于明确选择恢复旧路径时。
 
 - 私有配置 `~/.config/health-auto-export/workbench.json`（600）：`url` 与专用上传 `token`。同步不再依赖 MCP 请求头或健康应用的数据接口；授权上传钥匙不在命令或日志输出。
 - `POST /api/health/import` 支持 `sync_source`（manual / mac-bridge / iphone）与 `sync_interval`。只有内容变化才改写 sleep_days.received；每轮检查结果存在 health_sync，不伪造新睡眠。
@@ -96,9 +96,11 @@ Mac 版应用重新启动不会自动恢复内部 MCP 端口。因此同步程�
 
 ## iPhone 直传、运动与服务器 MCP
 
-目标通路是 iPhone Health Auto Export → HTTPS 接收接口 → 私有数据库 → 网站 / MCP。Mac 只作为查看端；旧 Mac 桥接在手机真实上传验收后停用。手机锁屏与 iOS 后台调度仍会影响上传时机，不能承诺仅开机即可固定频率读取健康数据。
+当前通路是 iPhone Health Auto Export → HTTPS 接收接口 → 私有数据库 → 网站 / MCP。已通过真机健康指标、训练记录上传验收，并在 Mac 中转停用后观察到后续自动上传。Mac 只作为查看端。手机锁屏、低电量模式与 iOS 后台调度仍会影响上传时机，不能承诺仅开机即可固定频率读取健康数据。
 
 - 登录后 `GET /api/health/setup?kind=metrics` / `kind=workouts` 生成两个手机配置入口。一个同步睡眠和日常指标，一个同步 V2 训练记录；不启用路线/GPS导出。入口包含上传凭据，不公开分享。
+- 用 iPhone Safari 打开配置入口；真机 Chrome 未完成自定义协议跳转时改用 Safari。健康指标使用按天汇总；训练配置不能携带 aggregatedata / aggregatesleep / interval 等健康专用参数，否则应用拒绝导入。两项期望间隔均为 15 分钟，现场训练范围为近七天，重复记录按 UUID 更新。
 - `POST /api/health/import` 接受原生按天汇总的 JSON。活动指标保存到 health_metrics；训练按 UUID 保存到 workouts。只存支持的指标；重复上传不叠加计数。kJ/kcal、km/mi 等统一换算，训练热量不重复加进日常活动热量。
 - 来源 `iphone` / `iphone-workouts` 分别保留成功时间。收到手机直传后，页面优先显示手机状态；尚未收到的指标清楚留空。
+- 任一已配置手机通路报错或超过预期间隔，总状态都会提示异常；训练上传成功不能掩盖健康指标断流。验收分别检查手机响应、服务器回执、网页真实值和后续自动运行。
 - 只读 MCP：`POST /api/health/mcp`，使用已有工作台 owner Bearer 授权，上传钥匙无读取权限。支持 initialize、ping、tools/list、tools/call；提供 get_health_overview、get_health_history、get_workouts。工具只读数据库，不调用模型或采集设备。

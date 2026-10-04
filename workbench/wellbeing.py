@@ -183,7 +183,8 @@ def health_snapshot():
     if any(s.get('success') for s in phone):
         automatic = phone
     live = [s for s in automatic if time.time() - s["checked"] <= max(1800, s["interval"] * 2.5)]
-    status = "ok" if any(s["status"] == "ok" for s in live) else "error" if live else "delayed" if automatic else "unconfigured"
+    status = ("error" if any(s["status"] != "ok" for s in live) else
+              "delayed" if len(live) < len(automatic) else "ok" if live else "unconfigured")
     return {"today": today(), "sleep": sleep, "metrics": metrics, "workouts": workouts, "checkins": checkins,
             "sync": {"status": status, "sources": sources, "primary": "iphone" if automatic == phone and phone else "mac-bridge"}}
 
