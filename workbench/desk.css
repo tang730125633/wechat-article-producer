@@ -42,3 +42,5 @@ body{background:var(--desk-paper);color:var(--desk-ink)}
 .flow-entry:hover{border-color:#9bb28d;background:#e9efdf}.flow-entry-mark{font:38px/1 var(--desk-serif);color:var(--desk-green)}
 .flow-entry strong{font:700 22px var(--desk-serif);display:block}.flow-entry small{display:block;font-size:13px;color:var(--desk-muted);line-height:1.8;margin:10px 0 18px}.flow-entry b{font-size:14px;font-weight:500;color:var(--desk-green)}
 @media(max-width:780px){.worktop nav .desk-nav-link{font-size:16px;padding:10px}.worktop nav{scrollbar-width:thin}.worktop nav>*{flex-shrink:0}.flow-entry{margin-bottom:20px;padding:21px}}
+
+.desk-home-link{display:inline-flex;align-items:center;min-height:44px;color:var(--desk-green);font-size:13px;text-underline-offset:4px}.desk-home-link:focus-visible{outline:2px solid var(--desk-green);outline-offset:4px}
