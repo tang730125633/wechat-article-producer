@@ -91,3 +91,5 @@ zsh -n 打开公众号排版器.command
 Mac 版应用重新启动不会自动恢复内部 MCP 端口。因此同步程序改为读取官方 Sync to Mac 路径下的 `sleep_analysis/yyyyMMdd.hae`，使用 macOS 自带 Compression 库解开 LZFSE，再对当前已验证的 Health Auto Export 4.x 睡眠片段格式做日期、单位、时长及重叠校验。仅合计睡眠，清醒片段不计入；忽略 iCloud 的带编号冲突副本。未知格式或冲突片段报错，不当成空数据或零睡眠。
 
 这条路径不启动、关闭或控制健康应用，MCP 端口关闭也能同步。仍依赖 iPhone → iCloud 文件同步、Mac 在线及文件已下载；文件来自用户已有授权导出，不修改原文件。默认目录可用 `--source-dir` 指定。
+
+运行身份：launchd 需指向已授权的真实 `Python.app/Contents/MacOS/Python`，不能只使用 `/usr/bin/python3` 命令行启动壳。现场 macOS 日志显示该启动壳的身份曾被归到 git，导致重新加载后的 iCloud 读取被拒绝。真实 Python 的完全磁盘访问授权必须由用户明确同意，并通过系统设置、本人身份验证完成；不得修改 TCC 数据库绕过。修复验收需覆盖重新加载任务与随后自动计时运行，而不是只看一次手动成功。
