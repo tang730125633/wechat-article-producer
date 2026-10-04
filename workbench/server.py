@@ -279,16 +279,18 @@ def allowed_origin(origin):
 
 
 class Handler(SimpleHTTPRequestHandler):
+    def session_cookie(self):
+        try:
+            cookies = SimpleCookie(self.headers.get("Cookie", ""))
+            return cookies["tang_workbench"].value if "tang_workbench" in cookies else ""
+        except Exception:
+            return ""
+
     def authenticated(self):
         if not PUBLIC_ORIGIN:
             return True
-        try:
-            cookies = SimpleCookie(self.headers.get("Cookie", ""))
-            cookie = cookies["tang_workbench"].value if "tang_workbench" in cookies else ""
-        except Exception:
-            cookie = ""
         bearer = self.headers.get("Authorization", "").removeprefix("Bearer ")
-        return library.authorized(bearer, cookie)
+        return library.authorized(bearer, self.session_cookie())
 
     def send_json(self, status, payload, cookie=None):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -297,21 +299,25 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         if cookie:
-            self.send_header("Set-Cookie", f"tang_workbench={cookie}; HttpOnly; Secure; SameSite=Strict; Path=/wechat/; Max-Age=2592000")
+            self.send_header("Set-Cookie", f"tang_workbench={cookie}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=2592000")
+            self.send_header("Set-Cookie", "tang_workbench=; HttpOnly; Secure; SameSite=Strict; Path=/wechat/; Max-Age=0")
         self.end_headers()
         self.wfile.write(body)
 
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/api/wechat/status":
+            authenticated = self.authenticated()
             return self.send_json(200, {
                 "app": APP_ID,
                 "configured": bool(keychain_get("appid") and keychain_get("appsecret")),
-                "authenticated": self.authenticated(), "cloud": bool(PUBLIC_ORIGIN),
-            })
+                "authenticated": authenticated, "cloud": bool(PUBLIC_ORIGIN),
+            }, cookie=self.session_cookie() if authenticated else None)
         if parsed.path.startswith("/api/"):
             if not self.authenticated():
                 return self.send_json(401, {"error": "请先登录自己的文章工作台"})
+            if parsed.path == "/api/access":
+                return self.send_json(200, {"authenticated": True})
             query = urllib.parse.parse_qs(parsed.query)
             if parsed.path == '/api/health/mcp':
                 return self.send_json(405, {'error':'Use POST for stateless MCP requests'})

@@ -211,7 +211,7 @@
 <body>
   <header class="worktop">
     <div class="desk-brand"><strong>泽龙的书桌</strong><span>写下生活，也照顾好自己</span></div>
-    <nav aria-label="工作区"><button id="showToday" type="button">今天</button><button id="showLibrary" type="button">文章</button><button id="showIdeas" type="button">灵感</button><button id="showHealth" type="button">身体</button><button id="showReview" type="button">回顾</button><button id="showEditor" type="button" hidden>当前文章</button></nav>
+    <nav aria-label="工作区"><button id="showToday" type="button">今天</button><button id="showLibrary" type="button">文章</button><button id="showIdeas" type="button">灵感</button><button id="showHealth" type="button">身体</button><a href="/flow/" class="desk-nav-link">心流</a><button id="showReview" type="button">回顾</button><button id="showEditor" type="button" hidden>当前文章</button></nav>
     <div class="desk-signature"><span aria-hidden="true">☼</span> 好好生活，慢慢变好 <b>Tang</b></div>
     <span id="cloudSaveStatus" role="status" aria-live="polite">正在连接你的书桌…</span><button id="saveArticle" type="button" hidden>保存文章</button>
   </header>
@@ -230,6 +230,7 @@
         <section class="ideas-preview"><div class="section-heading"><h2>那些没来得及说的想法</h2><button id="allIdeas" type="button">查看全部 →</button></div><div id="ideaCards" class="idea-cards"></div></section>
       </section>
       <aside class="desk-companion">
+        <a class="flow-entry" href="/flow/"><span class="flow-entry-mark" aria-hidden="true">∿</span><span><strong>从内耗到心流</strong><small>看看当下的状态，找回专注的节奏。</small><b>进入心流练习 →</b></span></a>
         <section class="companion-card"><h2>小秋在这里</h2><p class="subtle">陪你思考，也陪你好好生活。</p><div class="companion-message"><img src="xiaoqiu.png" alt="小秋的插画头像" width="84" height="84"><p id="careQuestion">今天的你，感觉怎么样？<br>留一句话给自己吧。</p></div><button type="button" id="shareFeeling" class="text-button">说说今天的状态 ↗</button></section>
         <section class="recent-card"><div class="section-heading"><h2>你最近在写</h2><button id="allArticles" type="button">查看全部 →</button></div><img id="recentCover" alt="当前文章封面" hidden><div id="recentEmpty" class="recent-empty">还没有开始的文章。<br>从左边的一句话开始吧。</div><h3 id="recentTitle"></h3><p id="recentDigest" class="subtle"></p><div class="recent-actions"><span id="recentState"></span><button id="continueArticle" type="button" class="desk-primary" hidden>继续这篇 →</button></div></section>
         <button id="eveningReview" class="evening-card" type="button"><span class="moon-icon" aria-hidden="true">☾</span><span><strong>留一分钟，聊聊今天</strong><small>做了什么，卡在哪里，都可以留下。</small></span><span aria-hidden="true">↗</span></button>

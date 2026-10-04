@@ -223,6 +223,11 @@
     $('#ownerLogin').hidden = signedIn;
     if (!signedIn) {status.textContent = '请登录自己的文章库'; return;}
     status.textContent = '文章库已连接';
+    if (new URLSearchParams(location.search).get('next') === 'flow') {
+      const section = ['#assessment','#result','#history','#compare','#source'].includes(location.hash) ? location.hash : '';
+      location.replace('/flow/' + section);
+      return;
+    }
     await refresh();
     window.dispatchEvent(new CustomEvent('workbench-ready'));
     if (new URLSearchParams(location.search).get('recover') === '1' && recoverable?.markdown) {
