@@ -3,6 +3,7 @@ import tempfile
 import threading
 import unittest
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 from pathlib import Path
@@ -60,6 +61,15 @@ class WellbeingChecks(unittest.TestCase):
                 self.assertEqual(request('/api/wellbeing',upload)[0],401)
                 self.assertEqual(request('/api/articles',upload)[0],401)
                 self.assertEqual(request('/api/health/setup',upload)[0],401)
+                for kind in ('metrics','workouts'):
+                    status, setup=request('/api/health/setup?kind='+kind,owner)
+                    self.assertEqual(status,200)
+                    params=urllib.parse.parse_qs(urllib.parse.urlsplit(setup['setup_url']).query)
+                    self.assertEqual(params['datatype'],['healthMetrics' if kind=='metrics' else 'workouts'])
+                    for field in ('aggregatedata','aggregatesleep','interval','metrics'):
+                        self.assertEqual(field in params,kind=='metrics')
+                    if kind=='workouts':
+                        self.assertEqual(params['includeroutes'],['false'])
                 rpc={'jsonrpc':'2.0','id':1,'method':'tools/list'}
                 self.assertEqual(request('/api/health/mcp',upload,rpc)[0],401)
                 self.assertEqual(len(request('/api/health/mcp',owner,rpc)[1]['result']['tools']),3)

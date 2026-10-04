@@ -332,12 +332,14 @@ class Handler(SimpleHTTPRequestHandler):
                 source = 'iphone' if kind == 'metrics' else 'iphone-workouts'
                 params = {"name": "泽龙健康指标直传" if kind == 'metrics' else '泽龙训练记录直传', "url": endpoint, "format": "json",
                     "datatype": "healthMetrics" if kind == 'metrics' else 'workouts', "period": "none",
-                    "aggregatedata": "true", "aggregatesleep": "true", "interval": "days",
                     "exportversion": "v2", "syncinterval": "minutes", "syncquantity": "15",
                     "headers": "Authorization,Bearer " + wellbeing.upload_key() + ",X-Health-Source," + source, "enabled": "true",
-                    "includeroutes": "false", "includeworkoutmetadata": "false", "notifywhenrun": "false"}
+                    "notifywhenrun": "false"}
                 if kind == 'metrics':
+                    params.update(aggregatedata="true", aggregatesleep="true", interval="days")
                     params['metrics'] = ','.join(['Sleep Analysis'] + [spec[0] for spec in wellbeing.METRICS.values()])
+                else:
+                    params.update(includeroutes="false", includeworkoutmetadata="false")
                 return self.send_json(200, {"setup_url": "com.HealthExport://automation?" + urllib.parse.urlencode(params, quote_via=urllib.parse.quote), "endpoint": endpoint})
             if parsed.path == "/api/articles":
                 if not article_id:
