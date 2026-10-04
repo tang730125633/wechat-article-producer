@@ -60,6 +60,9 @@ class WellbeingChecks(unittest.TestCase):
                 self.assertEqual(request('/api/wellbeing',upload)[0],401)
                 self.assertEqual(request('/api/articles',upload)[0],401)
                 self.assertEqual(request('/api/health/setup',upload)[0],401)
+                rpc={'jsonrpc':'2.0','id':1,'method':'tools/list'}
+                self.assertEqual(request('/api/health/mcp',upload,rpc)[0],401)
+                self.assertEqual(len(request('/api/health/mcp',owner,rpc)[1]['result']['tools']),3)
                 self.assertEqual(request('/api/ideas',upload)[0],401)
                 self.assertEqual(request('/api/keywords',upload,{'keyword':'灵感'})[0],401)
                 self.assertEqual(request('/api/keywords',owner,{'keyword':'先有一个词'})[0],200)
@@ -98,7 +101,7 @@ class WellbeingChecks(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     wellbeing.import_sleep({'data':{'metrics':[{'name':'sleep_analysis','units':'hr','data':[good,bad]}]}})
                 self.assertEqual(wellbeing.snapshot()['sleep'],[])
-            wellbeing.import_sleep({'data':{'metrics':[{'name':'heart_rate','units':'count/min','data':[{'value':'private'}]},
+            wellbeing.import_sleep({'data':{'metrics':[{'name':'unsupported_metric','units':'count/min','data':[{'value':'private'}]},
                 {'name':'sleep_analysis','units':'hr','data':[good]}]}})
             self.assertNotIn('private',json.dumps(wellbeing.snapshot()))
 

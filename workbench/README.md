@@ -93,3 +93,12 @@ Mac 版应用重新启动不会自动恢复内部 MCP 端口。因此同步程�
 这条路径不启动、关闭或控制健康应用，MCP 端口关闭也能同步。仍依赖 iPhone → iCloud 文件同步、Mac 在线及文件已下载；文件来自用户已有授权导出，不修改原文件。默认目录可用 `--source-dir` 指定。
 
 运行身份：launchd 需指向已授权的真实 `Python.app/Contents/MacOS/Python`，不能只使用 `/usr/bin/python3` 命令行启动壳。现场 macOS 日志显示该启动壳的身份曾被归到 git，导致重新加载后的 iCloud 读取被拒绝。真实 Python 的完全磁盘访问授权必须由用户明确同意，并通过系统设置、本人身份验证完成；不得修改 TCC 数据库绕过。修复验收需覆盖重新加载任务与随后自动计时运行，而不是只看一次手动成功。
+
+## iPhone 直传、运动与服务器 MCP
+
+目标通路是 iPhone Health Auto Export → HTTPS 接收接口 → 私有数据库 → 网站 / MCP。Mac 只作为查看端；旧 Mac 桥接在手机真实上传验收后停用。手机锁屏与 iOS 后台调度仍会影响上传时机，不能承诺仅开机即可固定频率读取健康数据。
+
+- 登录后 `GET /api/health/setup?kind=metrics` / `kind=workouts` 生成两个手机配置入口。一个同步睡眠和日常指标，一个同步 V2 训练记录；不启用路线/GPS导出。入口包含上传凭据，不公开分享。
+- `POST /api/health/import` 接受原生按天汇总的 JSON。活动指标保存到 health_metrics；训练按 UUID 保存到 workouts。只存支持的指标；重复上传不叠加计数。kJ/kcal、km/mi 等统一换算，训练热量不重复加进日常活动热量。
+- 来源 `iphone` / `iphone-workouts` 分别保留成功时间。收到手机直传后，页面优先显示手机状态；尚未收到的指标清楚留空。
+- 只读 MCP：`POST /api/health/mcp`，使用已有工作台 owner Bearer 授权，上传钥匙无读取权限。支持 initialize、ping、tools/list、tools/call；提供 get_health_overview、get_health_history、get_workouts。工具只读数据库，不调用模型或采集设备。

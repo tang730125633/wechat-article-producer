@@ -39,6 +39,12 @@ wxwork open ARTICLE_ID
 
 首页包含已同步睡眠、今日感受和灵感。`wellbeing` 返回真实记录，缺失日期不能当作零，日汇总的 start/end 不能当入睡和起床时间。小秋可在用户问到时结合原话解读；未授权时不把健康记录自动改写为公众号文章。首页“开始写这篇”保存原话并打开编辑器，尚未接入网页内的大模型自动改写。当前 Mac 桥接通过本机 launchd 每 15 分钟读取 iCloud 已落地的睡眠文件，不依赖健康应用的 MCP 开关，Mac 休眠时暂停；页面每分钟读取服务器健康状态，切回页面也会检查。`wellbeing.sync` 中的检查时间与 sleep.received 的内容变化时间不同，不能把检查成功说成新增睡眠。网页健康区会显示断流/取数异常。iPhone 直传入口仍需用户在手机应用确认，入口配置好不等于手机持续同步已验收。
 
+## 手机健康与只读 MCP
+
+最终通路为 iPhone 直接上传服务器，Mac 仅查看。健康页提供健康指标和训练记录两个配置入口；配置存在不代表已收到数据，要分别核对 `sync.sources` 中 iphone / iphone-workouts 的成功时间。Mac 桥接仅在手机直传验收前临时保留。
+
+服务器 `/wechat/api/health/mcp` 使用工作台 owner Bearer 授权，支持只读 get_health_overview、get_health_history、get_workouts。网页与 MCP 共用真实数据；缺失不是零，日期不是实时测量时刻。不要仅凭心率/HRV等数字诊断用户。
+
 ## 灵感库与关系图谱
 
 `wxwork ideas` 读取全部灵感原句及其关联，网页入口为 `/wechat/?view=ideas`。

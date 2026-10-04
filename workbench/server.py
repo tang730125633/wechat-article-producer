@@ -23,6 +23,7 @@ from pathlib import Path
 from threading import Lock
 import library
 import wellbeing
+import health_mcp
 
 
 ROOT = Path(__file__).resolve().parent
@@ -312,6 +313,8 @@ class Handler(SimpleHTTPRequestHandler):
             if not self.authenticated():
                 return self.send_json(401, {"error": "请先登录自己的文章工作台"})
             query = urllib.parse.parse_qs(parsed.query)
+            if parsed.path == '/api/health/mcp':
+                return self.send_json(405, {'error':'Use POST for stateless MCP requests'})
             article_id = query.get("id", [""])[0]
             if parsed.path == "/api/wellbeing":
                 return self.send_json(200, wellbeing.snapshot())
@@ -323,11 +326,18 @@ class Handler(SimpleHTTPRequestHandler):
                 if not PUBLIC_ORIGIN.startswith("https://"):
                     return self.send_json(400, {"error": "请从线上工作台配置手机同步"})
                 endpoint = PUBLIC_ORIGIN + "/wechat/api/health/import"
-                params = {"name": "泽龙的睡眠工作台", "url": endpoint, "format": "json",
-                    "datatype": "healthMetrics", "metrics": "Sleep Analysis", "period": "none",
+                kind = query.get('kind', ['metrics'])[0]
+                if kind not in ('metrics', 'workouts'):
+                    return self.send_json(400, {'error': '同步类型不支持'})
+                source = 'iphone' if kind == 'metrics' else 'iphone-workouts'
+                params = {"name": "泽龙健康指标直传" if kind == 'metrics' else '泽龙训练记录直传', "url": endpoint, "format": "json",
+                    "datatype": "healthMetrics" if kind == 'metrics' else 'workouts', "period": "none",
                     "aggregatedata": "true", "aggregatesleep": "true", "interval": "days",
-                    "exportversion": "v2", "syncinterval": "hours", "syncquantity": "2",
-                    "headers": "Authorization,Bearer " + wellbeing.upload_key() + ",X-Health-Source,iphone", "enabled": "true"}
+                    "exportversion": "v2", "syncinterval": "minutes", "syncquantity": "15",
+                    "headers": "Authorization,Bearer " + wellbeing.upload_key() + ",X-Health-Source," + source, "enabled": "true",
+                    "includeroutes": "false", "includeworkoutmetadata": "false", "notifywhenrun": "false"}
+                if kind == 'metrics':
+                    params['metrics'] = ','.join(['Sleep Analysis'] + [spec[0] for spec in wellbeing.METRICS.values()])
                 return self.send_json(200, {"setup_url": "com.HealthExport://automation?" + urllib.parse.urlencode(params, quote_via=urllib.parse.quote), "endpoint": endpoint})
             if parsed.path == "/api/articles":
                 if not article_id:
@@ -347,6 +357,21 @@ class Handler(SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def do_POST(self):
+        if self.path == '/api/health/mcp':
+            if not allowed_origin(self.headers.get('Origin','')):
+                return self.send_json(403, {'error':'Origin not allowed'})
+            if not self.authenticated():
+                return self.send_json(401, {'error':'Authentication required'})
+            try:
+                length=int(self.headers.get('Content-Length','0'))
+                if not 0 < length <= 1000000:
+                    return self.send_json(413, {'error':'Request too large or empty'})
+                result=health_mcp.handle(json.loads(self.rfile.read(length)))
+            except (ValueError,UnicodeDecodeError):
+                result={'jsonrpc':'2.0','id':None,'error':{'code':-32700,'message':'Parse error'}}
+            if result is None:
+                self.send_response(202);self.send_header('Content-Length','0');self.end_headers();return
+            return self.send_json(200,result)
         if self.path not in {"/api/wechat/upload-image", "/api/wechat/draft", "/api/articles", "/api/session", "/api/health/import", "/api/health/sync", "/api/checkin", "/api/notes", "/api/ideas", "/api/keywords"}:
             return self.send_json(404, {"error": "接口不存在"})
         if self.headers.get("Content-Type", "").split(";", 1)[0] != "application/json":
