@@ -97,8 +97,10 @@ def summarize_cache(value, day):
 
 def read_sleep(folder=SOURCE_DIR):
     folder = Path(folder).expanduser()
-    if not folder.is_dir():
-        raise SyncError('source_unavailable')
+    try:
+        folder.stat()
+    except OSError as error:
+        raise SyncError('source_unavailable') from error
     now = dt.datetime.now(dt.timezone(dt.timedelta(hours=8))).date()
     records = []
     try:
@@ -110,8 +112,8 @@ def read_sleep(folder=SOURCE_DIR):
                 record = summarize_cache(decode_cache(path), day.isoformat())
                 if record:
                     records.append(record)
-    except OSError:
-        raise SyncError('source_unavailable') from None
+    except OSError as error:
+        raise SyncError('source_unavailable') from error
     except (ValueError, KeyError, TypeError, OverflowError, AttributeError):
         raise SyncError('invalid_source_data') from None
     return {'data': {'metrics': [{'name': 'sleep_analysis', 'units': 'hr', 'data': records}] if records else []}}
@@ -158,6 +160,8 @@ def main():
         return 0
     except (OSError,ValueError,KeyError,SyncError) as error:
         result.update(status='error',code=str(error) if isinstance(error,SyncError) else type(error).__name__)
+        if isinstance(error.__cause__, OSError):
+            result['errno'] = error.__cause__.errno
         print(json.dumps(result),flush=True)
         return 1
 
