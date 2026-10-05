@@ -46,7 +46,7 @@ body{background:var(--desk-paper);color:var(--desk-ink)}
 .desk-home-link{display:inline-flex;align-items:center;min-height:44px;color:var(--desk-green);font-size:13px;text-underline-offset:4px}.desk-home-link:focus-visible{outline:2px solid var(--desk-green);outline-offset:4px}
 
 /* Sleep drill-down: existing day bars open one shared, accessible detail dialog. */
-button.sleep-bar{border:0;background:none;padding:0;min-width:0;flex:1;color:inherit;cursor:pointer}
+button.sleep-bar{border:0;background:none;padding:0;min-width:0;flex:1;font-size:10px;color:var(--desk-muted);cursor:pointer}
 button.sleep-bar:disabled,button.health-day-column:disabled{cursor:default}
 button.sleep-bar:not(:disabled):hover i{background:var(--desk-green)}
 button.health-day-column{border:0;background:none;padding:5px 2px;color:var(--desk-muted);font:inherit;cursor:pointer;border-radius:8px}
@@ -65,3 +65,5 @@ button.health-day-column:not(:disabled):hover{background:#e7eddc}button.health-d
 .sleep-segment-list{margin:14px 0;padding:12px 0;border-block:1px solid var(--desk-line);font-size:12px}.sleep-segment-list summary{cursor:pointer;color:var(--desk-green)}.sleep-segment-list table{border-collapse:collapse;width:100%;margin-top:13px}.sleep-segment-list td{padding:9px 3px;border-top:1px solid var(--desk-line);font-size:12px}.sleep-segment-list td:last-child{text-align:right}
 .sleep-signal-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.sleep-signal-grid>div{padding:16px;background:#fffefa;border:1px solid var(--desk-line);border-radius:10px}.sleep-signal-grid span,.sleep-signal-grid small{display:block;color:var(--desk-muted);font-size:12px}.sleep-signal-grid strong{display:block;font:700 25px var(--desk-serif);margin:8px 0}.sleep-signal-grid small{font-size:11px;line-height:1.7}
 @media(max-width:600px){#deskDialog.sleep-dialog{position:fixed;inset:auto 0 0;margin:0;width:100%;max-width:none;border-radius:22px 22px 0 0;max-height:94vh;max-height:94dvh;padding:24px 20px calc(24px + env(safe-area-inset-bottom))}.sleep-detail-total strong{font-size:39px}.sleep-detail-stages{grid-template-columns:1fr}.sleep-detail-stage{padding:16px}.sleep-detail-stage>span{font-size:14px}.sleep-detail-stage strong{font-size:19px}.sleep-timeline-lane{grid-template-columns:58px minmax(0,1fr);gap:6px}.sleep-timeline-axis{margin-left:64px}.sleep-lane-track{height:48px}.sleep-piece{height:29px;top:9px}.sleep-detail-nav{margin-top:20px}}
+
+button.health-day-column{font-size:11px}.health-day-column .health-bar-area{display:flex;margin-top:0}
