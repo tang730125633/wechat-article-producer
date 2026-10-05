@@ -6,13 +6,50 @@
   let healthRequest=null,healthReadFailed=false,lastHealthFetch=0,healthPeriod='today';
   const input = $('#ideaInput'), captureStatus = $('#captureStatus');
   const cacheKey = 'tang-desk-capture';
+  const capturePanel=$('#memoryCapture'),memoryHome=$('#memoryHome'),recallKey='tang-desk-recall',operationKey='tang-desk-capture-operation';
+  let recall=null,recallLoaded=false,recallLibrary={ideas:[],keywords:[]};
   try { input.value = localStorage.getItem(cacheKey) || ''; } catch (_) {}
-  input.addEventListener('input', () => {operation = null; try {localStorage.setItem(cacheKey,input.value);} catch (_) {captureStatus.textContent='设备暂存不可用，请点击“先记下来”保存。';}});
+  try{recall=JSON.parse(localStorage.getItem(recallKey)||'null');operation=JSON.parse(localStorage.getItem(operationKey)||'null');if(operation?.text!==input.value.trim())operation=null;}catch(_){}
+  input.addEventListener('input', () => {operation = null; $('#captureReceipt').hidden=true; try {localStorage.setItem(cacheKey,input.value);localStorage.removeItem(operationKey);feedback('已暂存在这台设备，点“留下这句”保存到书桌。');} catch (_) {captureStatus.textContent='设备暂存不可用，请点击“留下这句”保存。';}});
   const node = (tag, text, className) => {const el=document.createElement(tag);if(text!==undefined) el.textContent=text;if(className) el.className=className;return el;};
   const date = t => new Date(t*1000).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
   const duration = value => {if(value==null) return '—';const m=Math.floor(value*60+1e-6);return m<60?`${m}分钟`:`${Math.floor(m/60)}小时${m%60}分`;};
   function feedback(text,error=false){captureStatus.textContent=text;captureStatus.dataset.error=String(error);}
   function button(text,callback,style='quiet-button'){const b=node('button',text,style);b.type='button';b.addEventListener('click',callback);return b;}
+  if(input.value.trim())feedback('已找回上次没写完的文字，接着写就好。');
+  function rememberRecall(){try{localStorage.setItem(recallKey,JSON.stringify(recall));}catch(_){}}
+  function renderRecall(payload){
+    if(payload){recallLibrary=payload;recallLoaded=true;}
+    const {ideas,keywords}=recallLibrary,today=data?.today||new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Shanghai'});
+    const linked=[...new Set(ideas.flatMap(i=>i.keywords))],pool=linked.length?linked:keywords.map(k=>k.label);
+    if(!recall||!Array.isArray(recall.words)||!recall.words.length&&pool.length||recall.day!==today&&!input.value.trim()){
+      const offset=pool.length?Math.floor(Date.parse(today+'T00:00:00Z')/86400000)%pool.length:0;
+      const words=pool.length?Array.from({length:Math.min(3,pool.length)},(_,i)=>pool[(offset+i)%pool.length]):[];
+      recall={day:today,words,selected:words[0]||'',connect:true};rememberRecall();
+    }
+    const root=$('#memoryCue');root.replaceChildren(node('small',input.value.trim()?'把这个联想接着写':'今天，从一个词开始','recall-eyebrow'));
+    const words=node('div',undefined,'recall-words');words.setAttribute('aria-label','今天的联想关键词');
+    for(const word of recall.words){const b=button(word,()=>window.focusMemoryKeyword(word,true),'recall-word');b.setAttribute('aria-pressed',String(recall.selected===word));b.disabled=busy||!!operation;words.append(b);}root.append(words);
+    const word=recall.selected,quote=word&&ideas.filter(i=>i.keywords.includes(word)).at(-1);
+    root.append(node('h2',word?'「'+word+'」让你想起了什么？':'此刻，脑海里冒出了什么？'));
+    root.append(node('p','一个人、一个画面、一件小事。几个字也可以。','recall-prompt'));
+    if(quote){const detail=node('details',undefined,'recall-original');detail.append(node('summary','你曾说：'+quote.text.slice(0,52)+(quote.text.length>52?'…':'')),node('blockquote',quote.text),node('small',date(quote.created)+' · 原话'));root.append(detail);}
+    else root.append(node('p',!recallLoaded?'原话还在路上，你可以先写。':word?'这个词还没有原话，你想到的可以成为第一句。':'也可以直接写，不用先选词。','subtle'));
+    if(word){const label=node('label',undefined,'recall-link'),check=node('input');check.type='checkbox';check.checked=recall.connect;check.disabled=busy||!!operation;check.onchange=()=>{recall.connect=check.checked;rememberRecall();};label.append(check,node('span','保存时连到「'+word+'」'));root.append(label);}
+    input.placeholder=word?'「'+word+'」让我想起……':'刚刚，我想起了……';
+  }
+  window.focusMemoryKeyword=(word,focus=false)=>{
+    if(busy||operation)return;
+    if(!recall)renderRecall();
+    if(word){recall.selected=word;recall.connect=true;if(!recall.words.includes(word))recall.words=[word,...recall.words].slice(0,3);rememberRecall();renderRecall();}
+    if(focus){capturePanel.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});input.focus({preventScroll:true});}
+  };
+  window.mountMemoryCapture=(root,payload)=>{root.prepend(capturePanel);renderRecall(payload);};
+  function savedReceipt(saved){
+    const root=$('#captureReceipt');root.hidden=false;root.replaceChildren(node('strong',saved.keyword?'已留下，也连起来了。':'这句话已经留下了。'),node('p',saved.text));
+    if(saved.keyword){const link=node('div',undefined,'recall-saved-link');link.append(node('span',saved.keyword),node('span','—'),node('span','这句原话'));root.append(link);}
+    root.append(button(saved.keyword?'看看这条关联 →':'查看这句原话 →',async()=>{const detail=$('#detailContent');detail.ideaState={query:'',keyword:'',selected:saved.id,positions:new Map(),zoom:1,pan:{x:0,y:0}};await go('ideas');},'text-button'));
+  }
   function dialog(title){const root=$('#dialogContent');root.replaceChildren(node('h2',title));$('#deskDialog').showModal();return root;}
   function errorDialog(error){const root=dialog('这一步暂时没有完成');root.append(node('p',error.message));}
   async function go(view){try {if(!wb.signedIn) throw new Error('请先登录你的工作台');await wb.go(view);}catch(error){errorDialog(error);}}
@@ -20,6 +57,8 @@
   $('#allIdeas').onclick=()=>go('ideas');$('#allArticles').onclick=()=>go('articles');$('#sleepDetails').onclick=()=>go('health');$('#backToday').onclick=()=>go('today');
   window.addEventListener('workbench-view',event=>{
     activeView=event.detail;
+    $('#deskPage').dataset.view=activeView;
+    if(capturePanel.parentElement!==memoryHome)memoryHome.append(capturePanel);
     Object.entries(nav).forEach(([v,id])=>{if(v===activeView) $('#'+id).setAttribute('aria-current','page');else $('#'+id).removeAttribute('aria-current');});
     $('#todayDesk').hidden=activeView!=='today';$('#deskDetail').hidden=!['ideas','health','review'].includes(activeView);
     if(data) renderDetail();
@@ -31,7 +70,7 @@
     catch(error){feedback(error.message,true);if(!new URLSearchParams(location.search).has('article')) await go('today');$('#sleepSync').textContent='睡眠记录暂时读取失败';}
   });
   window.addEventListener('workbench-articles',event=>{articles=event.detail;renderRecent().catch(error=>{$('#recentEmpty').textContent=error.message;$('#recentEmpty').hidden=false;});});
-  async function refresh(){data=await wb.request('/api/wellbeing');healthReadFailed=false;renderHealth();renderIdeas();renderDetail();}
+  async function refresh(){data=await wb.request('/api/wellbeing');healthReadFailed=false;renderHealth();renderIdeas();renderDetail();if(activeView!=='ideas')try{renderRecall(await wb.request('/api/ideas'));}catch(_){renderRecall();}}
   async function refreshHealth(force=false){
     if(!wb.signedIn||document.hidden||healthRequest||(!force&&Date.now()-lastHealthFetch<15000))return healthRequest;
     lastHealthFetch=Date.now();
@@ -211,13 +250,15 @@
   function renderIdeas(){const ideas=data.notes.filter(n=>n.kind==='idea').slice(0,3);$('#ideaCards').replaceChildren();for(const item of ideas){const card=button('',()=>openNote(item),'idea-card');card.append(node('strong',item.text.split('\n')[0].slice(0,26)),node('span',item.text.slice(0,70)));$('#ideaCards').append(card);}if(!ideas.length)$('#ideaCards').append(node('div','不用先想好题目。随手留一句话，灵感就有了自己的位置。','empty-ideas'));}
   async function capture(asArticle){
     const text=input.value.trim();if(!text){input.focus();feedback('先写一句话就好。');return;}if(busy)return;
-    busy=true;input.readOnly=true;$('#saveIdea').disabled=$('#startArticle').disabled=true;feedback(asArticle?'正在把原话放进文章…':'正在保存这个想法…');
+    if(recognition){feedback('先点话筒结束录音，再留下这句。');return;}
+    busy=true;renderRecall();input.readOnly=true;$('#saveIdea').disabled=$('#startArticle').disabled=true;feedback(asArticle?'正在把原话放进文章…':'正在保存这个想法…');
     try{
-      operation=operation||{id:crypto.randomUUID(),text,kind:'idea'};
-      await wb.request('/api/notes',operation);
+      operation=operation||{id:crypto.randomUUID(),text,kind:'idea',...(recall?.connect&&recall.selected?{keyword:recall.selected}:{})};
+      try{localStorage.setItem(operationKey,JSON.stringify(operation));}catch(_){}
+      const saved=await wb.request('/api/notes',operation);savedReceipt(saved);
       if(asArticle){await wb.create({title:text.split('\n')[0].slice(0,36),markdown:text,theme:'spring',images:{}});showToast('原话已保存成文章，可以继续编辑或让小秋接着整理');}
-      input.value='';operation=null;try{localStorage.removeItem(cacheKey);}catch(_){}feedback('已保存到书桌，随时可以接着写。');await refresh();
-    }catch(error){feedback(error.message+'。文字已保留，请先核对保存结果。',true);}finally{busy=false;input.readOnly=false;$('#saveIdea').disabled=$('#startArticle').disabled=false;}
+      input.value='';operation=null;try{localStorage.removeItem(cacheKey);localStorage.removeItem(operationKey);}catch(_){}feedback('已保存到书桌，今天又留下了一个想法。');await refresh().catch(()=>feedback('原话已保存，列表暂未刷新。稍后重新打开即可看到。'));
+    }catch(error){feedback(error.message+'。文字已保留，请先核对保存结果。',true);}finally{busy=false;input.readOnly=false;$('#saveIdea').disabled=$('#startArticle').disabled=false;renderRecall();}
   }
   $('#captureForm').onsubmit=event=>{event.preventDefault();capture(false);};$('#startArticle').onclick=()=>capture(true);
   function openNote(item){const root=dialog(item.kind==='idea'?'把这个想法接着写':'那天留下的话');const p=node('p',item.text);p.style.whiteSpace='pre-wrap';root.append(p,node('p',date(item.created)));if(item.kind==='idea')root.append(button('放回书桌继续写',async()=>{input.value=item.text;input.dispatchEvent(new Event('input'));$('#deskDialog').close();await go('today');input.focus();},'desk-primary'));}
@@ -232,7 +273,7 @@
   $('#shareFeeling').onclick=reflection;$('#eveningReview').onclick=reflection;
   function renderDetail(){
     if(!data||!['ideas','health','review'].includes(activeView))return;
-    const root=$('#detailContent');root.replaceChildren();$('#deskDetail').classList.toggle('ideas-wide',activeView==='ideas');$('#detailTitle').textContent={ideas:'灵感有了自己的连接',health:'身体的节奏',review:'慢慢留下，慢慢看见'}[activeView];$('#detailIntro').textContent={ideas:'从一个关键词，找回那句话、那段记忆，以及下一步想做的事。',health:'看看真实记录，也听听自己的感受。',review:'你的每天，不只有完成了多少事情。'}[activeView];
+    const root=$('#detailContent');if(capturePanel.parentElement!==memoryHome)memoryHome.append(capturePanel);root.replaceChildren();$('#deskDetail').classList.toggle('ideas-wide',activeView==='ideas');$('#detailTitle').textContent={ideas:'一个词，接上一段记忆',health:'身体的节奏',review:'慢慢留下，慢慢看见'}[activeView];$('#detailIntro').textContent={ideas:'先留下想到的。原话、关键词和它们的联系，都在这里。',health:'看看真实记录，也听听自己的感受。',review:'你的每天，不只有完成了多少事情。'}[activeView];
     if(activeView==='ideas'){
       window.renderIdeaLibrary(root,{onContinue:async item=>{if(input.value.trim()&&input.value.trim()!==item.text)await wb.request('/api/notes',{id:crypto.randomUUID(),kind:'idea',text:input.value.trim()});input.value=item.text;input.dispatchEvent(new Event('input'));await go('today');input.focus();}});
       return;

@@ -228,15 +228,26 @@ def save_note(body):
     if not isinstance(note_id, str):
         raise ValueError("记录编号格式错误")
     uuid.UUID(note_id)
+    keyword = keyword_label(body['keyword']) if body.get('keyword') is not None else None
+    if keyword and kind != 'idea':
+        raise ValueError('只有灵感可以关联关键词')
     with connect() as db:
+        db.execute('BEGIN IMMEDIATE')
         old = db.execute("SELECT * FROM notes WHERE id=?", (note_id,)).fetchone()
         if old:
             if old["text"] != text.strip() or old["kind"] != kind:
                 raise library.Conflict("这条记录已保存了不同内容，请先核对")
-            return dict(old)
+            if keyword:
+                links = db.execute('SELECT metadata FROM idea_links WHERE note_id=?', (note_id,)).fetchone()
+                if not links or keyword not in json.loads(links[0]).get('keywords', []):
+                    raise library.Conflict('原话已保存，关联已有变化，请到灵感库核对')
+            return {**dict(old), 'keyword': keyword}
         note = {"id": note_id, "kind": kind, "text": text.strip(), "created": time.time()}
         db.execute("INSERT INTO notes VALUES (:id,:kind,:text,:created)", note)
-    return note
+        if keyword:
+            db.execute('INSERT INTO idea_links VALUES (?,?,?,?,?)',
+                       (note_id, json.dumps({'keywords': [keyword]}, ensure_ascii=False), 1, note['created'], 'zelong/网页记录'))
+    return {**note, 'keyword': keyword}
 
 
 def ideas():

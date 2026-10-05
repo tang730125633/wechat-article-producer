@@ -13,6 +13,19 @@ import wellbeing
 
 
 class WellbeingChecks(unittest.TestCase):
+    def test_keyword_capture_is_atomic_and_retry_keeps_one_original(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(server.library, 'DATA', Path(folder)):
+            body = {'id': str(uuid.uuid4()), 'kind': 'idea', 'text': '想起那个人', 'keyword': '记忆'}
+            for _ in range(2):
+                self.assertEqual(wellbeing.save_note(body)['keyword'], '记忆')
+            self.assertEqual(len(wellbeing.ideas()), 1)
+            self.assertEqual(wellbeing.ideas()[0]['keywords'], ['记忆'])
+            with self.assertRaises(server.library.Conflict):
+                wellbeing.save_note({**body, 'keyword': '另一个词'})
+            with self.assertRaises(ValueError):
+                wellbeing.save_note({**body, 'id': str(uuid.uuid4()), 'keyword': '长' * 41})
+            self.assertEqual(len(wellbeing.ideas()), 1)
+
     def test_workout_success_cannot_hide_stale_or_failed_health_metrics(self):
         with tempfile.TemporaryDirectory() as folder, patch.object(server.library,'DATA',Path(folder)):
             metrics={'sync_source':'iphone','data':{'metrics':[{'name':'sleep_analysis','units':'hr',

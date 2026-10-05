@@ -10,12 +10,13 @@
   window.renderIdeaLibrary=async(root,{onContinue})=>{
     const state=root.ideaState||(root.ideaState={query:'',keyword:'',selected:'',positions:new Map(),zoom:1,pan:{x:0,y:0}});
     const requestId=Symbol();root.ideaRequest=requestId;
-    root.replaceChildren(element('p','正在把灵感和关键词连起来…','subtle'));
+    const loading=element('p','正在把灵感和关键词连起来…','subtle');root.replaceChildren(loading);window.mountMemoryCapture(root);
     let ideas=[],savedKeywords=[];
     async function load(){const response=await window.workbench.request('/api/ideas');ideas=response.ideas;savedKeywords=response.keywords||[];}
-    try{await load();}catch(error){root.replaceChildren(element('p',error.message,'idea-error'));return;}
+    try{await load();}catch(error){loading.textContent=error.message+'。你可以先写，文字会暂存在这台设备。';loading.className='idea-error';return;}
     if(root.ideaRequest!==requestId||!root.isConnected||document.querySelector('#deskDetail').hidden||!document.querySelector('#deskDetail').classList.contains('ideas-wide'))return;
     root.replaceChildren();
+    window.mountMemoryCapture(root, {ideas,keywords:savedKeywords});
     const toolbar=element('div',undefined,'idea-toolbar');const search=element('input');search.type='search';search.placeholder='找一个词，或你说过的一句话…';search.setAttribute('aria-label','搜索灵感和关键词');search.value=state.query;
     const info=element('span','','subtle');const create=action('＋ 记个灵感',()=>editNew(),'desk-primary');toolbar.append(search,info,create);
     const layout=element('div',undefined,'ideas-layout'),left=element('section',undefined,'idea-originals'),side=element('aside',undefined,'ideas-side');left.setAttribute('aria-label','你的原话');
@@ -28,7 +29,7 @@
     const detail=element('section',undefined,'idea-connection-detail');side.append(tagsPanel,graphPanel,detail);layout.append(left,side);root.append(toolbar,layout);
     let visible=[];
     function matches(item){return !state.query||[item.text,...item.keywords,item.context,item.next_step,item.source_label].join('\n').toLowerCase().includes(state.query.toLowerCase());}
-    function chooseKeyword(word){state.keyword=state.keyword===key(word)?'':key(word);state.selected='';draw();}
+    function chooseKeyword(word){window.focusMemoryKeyword(word);state.keyword=state.keyword===key(word)?'':key(word);state.selected='';draw();}
     function chooseNote(id){state.selected=state.selected===id?'':id;state.keyword='';draw();}
     search.oninput=()=>{state.query=search.value;state.keyword='';state.selected='';draw();};
     function draw(){
@@ -55,11 +56,7 @@
       renderGraph(visible);
     }
     function showError(error){const dialog=document.querySelector('#deskDialog'),content=document.querySelector('#dialogContent');content.replaceChildren(element('h2','这一步暂时没有完成'),element('p',error.message));dialog.showModal();}
-    function editNew(keyword=''){
-      const dialog=document.querySelector('#deskDialog'),content=document.querySelector('#dialogContent');content.replaceChildren(element('h2','先把想法留下来'),element('p',keyword?'这句原话会关联到「'+keyword+'」。':'想到什么就记什么，关键词可以稍后和小秋一起整理。'));
-      const text=element('textarea');text.setAttribute('aria-label','新的灵感原话');text.maxLength=50000;const status=element('p','','dialog-status');const id=crypto.randomUUID();
-      const save=action(keyword?'保存并关联':'保存这句原话',async()=>{if(!text.value.trim()){text.focus();return;}save.disabled=true;text.readOnly=true;try{await window.workbench.request('/api/notes',{id,kind:'idea',text:text.value});if(keyword)await window.workbench.request('/api/ideas',{id,revision:0,keywords:[keyword],source:'zelong/网页整理'});await load();state.query=search.value='';state.keyword='';state.selected=id;dialog.close();draw();}catch(error){status.textContent=error.message+'。文字已保留，请先核对保存结果。';}finally{save.disabled=false;text.readOnly=false;}},'desk-primary');const actions=element('div',undefined,'dialog-actions');actions.append(save);content.append(text,status,actions);dialog.showModal();text.focus();
-    }
+    function editNew(keyword=''){window.focusMemoryKeyword(keyword,true);}
     function linkKeyword(word){
       const dialog=document.querySelector('#deskDialog'),content=document.querySelector('#dialogContent');content.replaceChildren(element('h2','把「'+word+'」连到原话'));
       if(!ideas.length){content.append(element('p','还没有原话。先给这个词补一句话吧。'),action('写一句原话',()=>{dialog.close();editNew(word);},'desk-primary'));dialog.showModal();return;}
