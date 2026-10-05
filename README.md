@@ -4,34 +4,30 @@
 
 把真实想法整理成文章，完成排版和配图，再交付到微信公众号。
 
-项目现在提供两条互不冲突的路径：
+## Agent 快速入口
 
-- `workbench/`：本地可视化排版器。粘贴文章、选择主题、插入图片、上传微信、复制 HTML。
-- `toolkit/`：原有命令行发布器。适合把 Markdown 自动转换并推送到公众号草稿箱。
+Codex、Pi、OpenClaw、Hermes 等能执行命令的 Agent 使用同一个 Python 标准库客户端，直接连接现有网站文章库。无需浏览器操作来读写文章，也不用将公众号 AppSecret 交给 Agent。
 
-## 推荐用法：可视化排版器
-
-适合个人创作和人工终审，不需要搭建网站或数据库。
-
-### macOS 启动
-
-进入 `workbench/`，双击：
-
-```text
-打开公众号排版器.command
+```sh
+python3 skills/wechat-article-producer/scripts/wxwork.py status
+python3 skills/wechat-article-producer/scripts/wxwork.py list
+python3 skills/wechat-article-producer/scripts/wxwork.py save --title '今天的想法' --file article.md
+python3 skills/wechat-article-producer/scripts/wxwork.py get ARTICLE_ID
+python3 skills/wechat-article-producer/scripts/wxwork.py save --id ARTICLE_ID --revision 1 --file revised.md
+python3 skills/wechat-article-producer/scripts/wxwork.py open ARTICLE_ID
 ```
 
-首次启动会询问公众号 AppID 和 AppSecret。凭据只保存在 macOS 钥匙串，不会写进网页、仓库或浏览器草稿。
+输出包含文章 ID、版本和网站预览链接。更新保留未指定的封面、配图、主题等字段，版本冲突会停止，不会自动覆盖其他 Agent 的稿件。`get` 默认不输出大体积图片，`--raw` 可取完整快照。
 
-### 创作流程
+把 [创作技能](skills/wechat-article-producer/SKILL.md) 所在目录链接或复制到 Agent 的技能目录即可发现；配置、调用说明和微信草稿导入边界都在该文件。客户端需要 Python 3.9+，无额外依赖。
 
-1. 粘贴 Markdown 或普通分段文章。
-2. 按需插入小标题、引用、金句、流程、图片位、分隔符和结尾签名。
-3. 从 11 套主题中选择排版。
-4. 粘贴或选择 JPG/PNG 图片，点击“上传到微信”。
-5. 点击“复制 HTML 源码”，粘贴到公众号编辑器。
+本机授权配置：`~/.config/wechat-workbench/config.json`（权限 600）。使用部署管理员提供的工作台 owner key，不是公众号 AppSecret。不同朋友需使用自己的实例/授权；当前后端是单用户工作台，不隔离多人数据。
 
-正文始终是原生文字，不会被栅格化成长图。图片上传后使用微信 `mmbiz.qpic.cn` 地址，导出时不会携带工作台按钮或脚本。
+## 网站与预览
+
+日常入口：[公众号工作台](https://zelong.vip/wechat/)。Agent 写入文章后，在网站审阅、微调、选择主题、添加封面和正文图，按授权导入公众号草稿箱。微信导入成功与正式发布不同，工具不会群发。
+
+本机辅助版：进入 `workbench/`，双击 `打开公众号排版器.command`。首次配置的凭据保存在 macOS 钥匙串。服务器版说明见 [workbench/README.md](workbench/README.md)。
 
 ## 工作台能力
 
@@ -43,13 +39,13 @@
 - 微信正文图片上传
 - macOS 钥匙串凭据保存
 - HTML 源码、公众号富文本和完整 HTML 下载
-- 浏览器本地文字草稿恢复
+- 云端文章库、版本历史、并发修改保护与浏览器文字恢复
 
 `workbench/examples/` 包含四张可编辑 SVG 和对应 PNG，用于演示解释型配图，而不是随机装饰图。
 
 ## 命令行草稿发布器
 
-原有自动草稿发布能力继续保留：
+以下为旧版独立发布器；日常 Agent 创作优先使用上面的 wxwork，以保留网站版本和统一凭据：
 
 ```bash
 python3 -m pip install -r requirements.txt
@@ -62,6 +58,7 @@ python3 toolkit/publish_article.py examples/test-article.md --cover path/to/cove
 ## 本地验证
 
 ```bash
+python3 -m unittest discover -s skills/wechat-article-producer/scripts
 python3 -m unittest discover -s workbench -p 'test_*.py'
 python3 workbench/server.py self-test
 python3 -m py_compile workbench/server.py toolkit/*.py
@@ -74,7 +71,7 @@ zsh -n workbench/打开公众号排版器.command
 wechat-article-producer/
 ├── workbench/                  # 可视化排版器与示例图
 ├── toolkit/                    # Markdown → 微信草稿箱工具
-├── skills/                     # OpenClaw 编排 Skill
+├── skills/                     # 跨 Agent 创作 Skill 与 wxwork 客户端
 ├── examples/                   # Markdown 示例
 ├── config.example.yaml         # 命令行发布配置示例
 ├── requirements.txt
@@ -84,10 +81,10 @@ wechat-article-producer/
 
 ## 安全边界
 
-- 工作台只监听 `127.0.0.1`，不会暴露到局域网或公网。
+- 后端只监听 `127.0.0.1`；服务器通过 HTTPS 代理与工作台授权提供私有文章接口。
 - 正文图片仅接受小于 1MB 的 JPG/PNG。
 - 上传、创建草稿和正式发布是不同动作；工作台不会自动发布文章。
-- 公众号 AppSecret 只进入 macOS 钥匙串。
+- 公众号 AppSecret 存在 macOS 钥匙串或服务器私有配置；Agent 只需独立的工作台授权。
 
 ## License
 

@@ -17,7 +17,13 @@ import urllib.request
 import webbrowser
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from html.parser import HTMLParser
+from http.cookies import SimpleCookie
 from pathlib import Path
+from threading import Lock
+import library
+import wellbeing
+import health_mcp
 
 
 ROOT = Path(__file__).resolve().parent
@@ -26,6 +32,10 @@ PORT = int(os.environ.get("WECHAT_WORKBENCH_PORT", "8766"))
 APP_ID = "wechat-article-producer-workbench-v2"
 KEYCHAIN_SERVICE = "Tang WeChat Publisher"
 TOKEN_CACHE = {"value": "", "expires_at": 0.0, "credentials": b""}
+DRAFT_RECEIPTS = {}
+DRAFT_LOCK = Lock()
+PUBLIC_ORIGIN = os.environ.get("WORKBENCH_PUBLIC_ORIGIN", "")
+CREDENTIAL_FILE = os.environ.get("WECHAT_CREDENTIAL_FILE", "")
 
 
 class WeChatError(Exception):
@@ -35,6 +45,11 @@ class WeChatError(Exception):
 
 
 def keychain_get(account):
+    if CREDENTIAL_FILE:
+        try:
+            return json.loads(Path(CREDENTIAL_FILE).read_text()).get(account, "")
+        except (OSError, ValueError):
+            return ""
     result = subprocess.run(
         ["security", "find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", account, "-w"],
         capture_output=True,
@@ -77,10 +92,12 @@ def api_json(url, data=None, headers=None):
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
         raise WeChatError(f"微信接口连接失败：{error}") from error
     if result.get("errcode"):
+        rejected_ip = re.search(r"invalid ip ([0-9.]+)", result.get("errmsg", ""))
         simple_errors = {
             40013: "公众号 AppID 不正确",
             40125: "公众号 AppSecret 不正确",
-            40164: "当前网络 IP 没有加入公众号 IP 白名单",
+            40164: f"请将当前网络 IP {rejected_ip.group(1) if rejected_ip else ''} 添加到公众号 IP 白名单，并保留原有条目",
+            48001: "当前公众号没有开通此接口权限",
         }
         message = simple_errors.get(result["errcode"], result.get("errmsg", "未知错误"))
         raise WeChatError(f"微信接口错误 {result['errcode']}：{message}", result["errcode"])
@@ -153,48 +170,279 @@ def upload_image(data_url):
     return result["url"]
 
 
+def wechat_request(path, data, content_type="application/json; charset=utf-8"):
+    for attempt in range(2):
+        token = urllib.parse.quote(access_token(force=bool(attempt)), safe="")
+        try:
+            return api_json(f"https://api.weixin.qq.com/cgi-bin/{path}{'&' if '?' in path else '?'}access_token={token}", data, {"Content-Type": content_type})
+        except WeChatError as error:
+            # Only an explicit token rejection is safe to retry, never a timeout.
+            if attempt or error.errcode not in {40001, 40014, 42001}:
+                raise
+
+
+class DraftImages(HTMLParser):
+    def handle_starttag(self, tag, attrs):
+        if tag == "img":
+            source = urllib.parse.urlparse(dict(attrs).get("src", ""))
+            if source.scheme not in {"http", "https"} or source.hostname not in {"mmbiz.qpic.cn", "mmbiz.qlogo.cn"}:
+                raise WeChatError("请先将正文图片上传到微信，再导入草稿")
+
+
+class Markup(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "img":
+            attrs = dict(attrs)
+            source = attrs.pop("data-src", None) or attrs.get("src", "")
+            parsed = urllib.parse.urlparse(source)
+            # WeChat changes src to data-src and selects a display size for the same asset.
+            parent, _, size = parsed.path.rpartition("/")
+            if parsed.hostname == "mmbiz.qpic.cn" and parent.startswith("/mmbiz") and size.isdigit():
+                source = "https://mmbiz.qpic.cn" + parent
+            attrs["src"] = source
+            attrs = list(attrs.items())
+        self.parts.append(("start", tag, sorted(attrs)))
+
+    def handle_endtag(self, tag):
+        self.parts.append(("end", tag))
+
+    def handle_data(self, data):
+        self.parts.append(("text", data))
+
+
+def same_html(left, right):
+    a, b = Markup(), Markup()
+    a.feed(left or ""); b.feed(right or "")
+    return a.parts == b.parts
+
+
+def create_draft(body):
+    article = {}
+    for key, label in (("title", "标题"), ("author", "作者"), ("digest", "摘要"), ("content", "正文")):
+        value = body.get(key, "")
+        if not isinstance(value, str):
+            raise WeChatError(f"{label}格式错误")
+        article[key] = value.strip()
+    if not article["title"] or not article["content"]:
+        raise WeChatError("请填写标题和正文")
+    DraftImages().feed(article["content"])
+    mime, filename, image = decode_image(body.get("cover_data_url"))
+    article_id = body.get("article_id", "")
+    if not isinstance(article_id, str) or len(article_id) > 100:
+        raise WeChatError("文章编号格式错误")
+    request_id = body.get("request_id", "")
+    if not isinstance(request_id, str) or len(request_id) > 128:
+        raise WeChatError("本次导入编号格式错误")
+    operation = b"\0" + request_id.encode() if request_id else b""
+    fingerprint = hashlib.sha256(json.dumps(article, ensure_ascii=False, sort_keys=True).encode() + image + keychain_get("appid").encode() + article_id.encode() + operation).hexdigest()
+    # One owner's imports are serialized; successful and uncertain receipts survive restart.
+    with DRAFT_LOCK:
+        previous = library.receipt_get(fingerprint)
+        if previous:
+            if previous.get("pending"):
+                raise WeChatError("上次导入结果尚不确定，请先检查微信草稿箱，勿重复导入。")
+            return {**previous, "reused": True}
+        boundary, upload = multipart_image(mime, filename, image)
+        cover = wechat_request("material/add_material?type=image", upload, f"multipart/form-data; boundary={boundary}")
+        if not cover.get("media_id"):
+            raise WeChatError("微信未返回永久封面素材，请稍后检查素材库")
+        article["thumb_media_id"] = cover["media_id"]
+        article.update(need_open_comment=0, only_fans_can_comment=0)
+        library.receipt_put(fingerprint, {"pending": True})
+        try:
+            result = wechat_request("draft/add", json.dumps({"articles": [article]}, ensure_ascii=False).encode())
+        except WeChatError as error:
+            if error.errcode is None:
+                raise WeChatError("未收到草稿创建回执，结果暂不确定。请先查看公众号草稿箱，勿立即重复导入。") from error
+            library.receipt_delete(fingerprint)
+            raise
+        if not result.get("media_id"):
+            raise WeChatError("微信未返回草稿编号，请先检查草稿箱，勿重复导入")
+        receipt = {"media_id": result["media_id"], "title": article["title"], "verified": False}
+        library.receipt_put(fingerprint, receipt)
+        try:
+            saved = wechat_request("draft/get", json.dumps({"media_id": result["media_id"]}).encode())
+            item = saved.get("news_item", [{}])[0]
+            receipt["verified"] = item.get("title") == article["title"] and same_html(item.get("content"), article["content"]) and item.get("thumb_media_id") == article["thumb_media_id"]
+        except (WeChatError, IndexError):
+            pass  # Creation succeeded; readback failure must never create another draft.
+        library.receipt_put(fingerprint, receipt)
+        return receipt
+
+
 def allowed_origin(origin):
-    return not origin or origin in {f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}"}
+    return not origin or origin in {f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}", PUBLIC_ORIGIN}
 
 
 class Handler(SimpleHTTPRequestHandler):
-    def send_json(self, status, payload):
+    def session_cookie(self):
+        try:
+            cookies = SimpleCookie(self.headers.get("Cookie", ""))
+            return cookies["tang_workbench"].value if "tang_workbench" in cookies else ""
+        except Exception:
+            return ""
+
+    def authenticated(self):
+        if not PUBLIC_ORIGIN:
+            return True
+        bearer = self.headers.get("Authorization", "").removeprefix("Bearer ")
+        return library.authorized(bearer, self.session_cookie())
+
+    def send_json(self, status, payload, cookie=None):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        if cookie:
+            self.send_header("Set-Cookie", f"tang_workbench={cookie}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=2592000")
+            self.send_header("Set-Cookie", "tang_workbench=; HttpOnly; Secure; SameSite=Strict; Path=/wechat/; Max-Age=0")
         self.end_headers()
         self.wfile.write(body)
 
     def do_GET(self):
-        if self.path == "/api/wechat/status":
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == "/api/wechat/status":
+            authenticated = self.authenticated()
             return self.send_json(200, {
                 "app": APP_ID,
                 "configured": bool(keychain_get("appid") and keychain_get("appsecret")),
-            })
+                "authenticated": authenticated, "cloud": bool(PUBLIC_ORIGIN),
+            }, cookie=self.session_cookie() if authenticated else None)
+        if parsed.path.startswith("/api/"):
+            if not self.authenticated():
+                return self.send_json(401, {"error": "请先登录自己的文章工作台"})
+            if parsed.path == "/api/access":
+                return self.send_json(200, {"authenticated": True})
+            query = urllib.parse.parse_qs(parsed.query)
+            if parsed.path == '/api/health/mcp':
+                return self.send_json(405, {'error':'Use POST for stateless MCP requests'})
+            article_id = query.get("id", [""])[0]
+            if parsed.path == "/api/wellbeing":
+                return self.send_json(200, wellbeing.snapshot())
+            if parsed.path == "/api/health":
+                return self.send_json(200, wellbeing.health_snapshot())
+            if parsed.path == '/api/health/sleep':
+                try:
+                    result = wellbeing.sleep_day_detail(query.get('day', [''])[0])
+                except ValueError:
+                    return self.send_json(400, {'error': '请选择有效日期'})
+                return self.send_json(200 if result else 404, result or {'error': '这天还没有睡眠记录'})
+            if parsed.path == "/api/ideas":
+                return self.send_json(200, {"ideas": wellbeing.ideas(), "keywords": wellbeing.keywords()})
+            if parsed.path == "/api/health/setup":
+                if not PUBLIC_ORIGIN.startswith("https://"):
+                    return self.send_json(400, {"error": "请从线上工作台配置手机同步"})
+                endpoint = PUBLIC_ORIGIN + "/wechat/api/health/import"
+                kind = query.get('kind', ['metrics'])[0]
+                if kind not in ('metrics', 'workouts', 'sleep'):
+                    return self.send_json(400, {'error': '同步类型不支持'})
+                source = {'metrics':'iphone', 'workouts':'iphone-workouts', 'sleep':'iphone-sleep'}[kind]
+                params = {"name": {'metrics':'泽龙健康指标直传','workouts':'泽龙训练记录直传','sleep':'泽龙睡眠分期直传'}[kind], "url": endpoint, "format": "json",
+                    "datatype": "workouts" if kind == 'workouts' else 'healthMetrics', "period": "none",
+                    "exportversion": "v2", "syncinterval": "minutes", "syncquantity": "15",
+                    "headers": "Authorization,Bearer " + wellbeing.upload_key() + ",X-Health-Source," + source, "enabled": "true",
+                    "notifywhenrun": "false"}
+                if kind == 'metrics':
+                    params.update(aggregatedata="true", aggregatesleep="true", interval="days")
+                    params['metrics'] = ','.join(['Sleep Analysis'] + [spec[0] for spec in wellbeing.METRICS.values()])
+                elif kind == 'sleep':
+                    params.update(aggregatedata="false", aggregatesleep="false", metrics="Sleep Analysis", batchrequests="false")
+                else:
+                    params.update(includeroutes="false", includeworkoutmetadata="false")
+                return self.send_json(200, {"setup_url": "com.HealthExport://automation?" + urllib.parse.urlencode(params, quote_via=urllib.parse.quote), "endpoint": endpoint})
+            if parsed.path == "/api/articles":
+                if not article_id:
+                    return self.send_json(200, {"articles": library.list_articles()})
+                try:
+                    version = int(query["revision"][0]) if "revision" in query else None
+                except ValueError:
+                    return self.send_json(400, {"error": "版本格式错误"})
+                item = library.get_article(article_id, version)
+                return self.send_json(200 if item else 404, item or {"error": "文章不存在"})
+            if parsed.path == "/api/versions":
+                return self.send_json(200, {"versions": library.versions(article_id)})
+            return self.send_json(404, {"error": "接口不存在"})
+        # Source, credentials and database are never served by this process.
+        if parsed.path not in {"/", "/index.html", "/library.js", "/library.css", "/desk.js", "/desk.css", "/ideas.js", "/ideas.css", "/xiaoqiu.png", "/body-album.jpg"} and not parsed.path.startswith("/examples/"):
+            return self.send_json(404, {"error": "文件不存在"})
         return super().do_GET()
 
     def do_POST(self):
-        if self.path != "/api/wechat/upload-image":
+        if self.path == '/api/health/mcp':
+            if not allowed_origin(self.headers.get('Origin','')):
+                return self.send_json(403, {'error':'Origin not allowed'})
+            if not self.authenticated():
+                return self.send_json(401, {'error':'Authentication required'})
+            try:
+                length=int(self.headers.get('Content-Length','0'))
+                if not 0 < length <= 1000000:
+                    return self.send_json(413, {'error':'Request too large or empty'})
+                result=health_mcp.handle(json.loads(self.rfile.read(length)))
+            except (ValueError,UnicodeDecodeError):
+                result={'jsonrpc':'2.0','id':None,'error':{'code':-32700,'message':'Parse error'}}
+            if result is None:
+                self.send_response(202);self.send_header('Content-Length','0');self.end_headers();return
+            return self.send_json(200,result)
+        if self.path not in {"/api/wechat/upload-image", "/api/wechat/draft", "/api/articles", "/api/session", "/api/health/import", "/api/health/sync", "/api/checkin", "/api/notes", "/api/ideas", "/api/keywords"}:
             return self.send_json(404, {"error": "接口不存在"})
         if self.headers.get("Content-Type", "").split(";", 1)[0] != "application/json":
             return self.send_json(415, {"error": "请求格式错误"})
         if not allowed_origin(self.headers.get("Origin", "")):
-            return self.send_json(403, {"error": "只允许本地排版器调用"})
+            return self.send_json(403, {"error": "请从工作台页面发起操作"})
+        health_upload = self.path in {"/api/health/import", "/api/health/sync"} and wellbeing.upload_authorized(self.headers.get("Authorization", ""))
+        if self.path != "/api/session" and not health_upload and not self.authenticated():
+            return self.send_json(401, {"error": "请先登录自己的文章工作台"})
         try:
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
             return self.send_json(400, {"error": "请求长度错误"})
-        if not 0 < length < 1_500_000:
-            return self.send_json(413, {"error": "图片请求过大"})
+        if not 0 < length < 16_000_000:
+            return self.send_json(413, {"error": "请求过大，请缩小图片或正文后重试"})
         try:
             body = json.loads(self.rfile.read(length))
             if not isinstance(body, dict):
                 raise WeChatError("请求格式错误")
-            url = upload_image(body.get("data_url", ""))
-            self.send_json(200, {"url": url})
-        except (json.JSONDecodeError, WeChatError) as error:
+            if self.path == "/api/health/import":
+                if not isinstance(body.get("data"), dict):
+                    raise ValueError("睡眠数据格式错误")
+                if self.headers.get("X-Health-Source"):
+                    body["sync_source"] = self.headers["X-Health-Source"]
+                try:
+                    result = wellbeing.import_sleep(body)
+                except ValueError:
+                    source, interval = wellbeing.sync_identity(body)
+                    wellbeing.report_sync({'sync_source': source, 'sync_interval': interval,
+                                           'status': 'error', 'error': 'invalid_source_data'})
+                    raise
+                return self.send_json(200, result)
+            if self.path == "/api/health/sync":
+                return self.send_json(200, wellbeing.report_sync(body))
+            if self.path == "/api/checkin":
+                return self.send_json(200, wellbeing.check_in(body))
+            if self.path == "/api/notes":
+                return self.send_json(200, wellbeing.save_note(body))
+            if self.path == "/api/ideas":
+                return self.send_json(200, wellbeing.save_idea_links(body))
+            if self.path == "/api/keywords":
+                return self.send_json(200, wellbeing.save_keyword(body))
+            if self.path == "/api/session":
+                token = library.login(body.get("code", ""))
+                return self.send_json(200 if token else 401, {"ok": bool(token), "error": "" if token else "密码不正确，或一次性登录码已失效"}, cookie=token)
+            if self.path == "/api/articles":
+                return self.send_json(200, library.save_article(body))
+            if self.path == "/api/wechat/draft":
+                self.send_json(200, create_draft(body))
+            else:
+                url = upload_image(body.get("data_url", ""))
+                self.send_json(200, {"url": url})
+        except library.Conflict as error:
+            self.send_json(409, {"error": str(error)})
+        except (ValueError, WeChatError) as error:
             self.send_json(400, {"error": str(error)})
 
 
@@ -229,13 +477,17 @@ def self_test():
 
 def main():
     parser = argparse.ArgumentParser(description="Tang 公众号排版工作台")
-    parser.add_argument("command", nargs="?", choices=["serve", "configure", "self-test"], default="serve")
+    parser.add_argument("command", nargs="?", choices=["serve", "configure", "self-test", "login-code"], default="serve")
     parser.add_argument("--open-browser", action="store_true")
     args = parser.parse_args()
     if args.command == "configure":
         return configure()
     if args.command == "self-test":
         return self_test()
+    if args.command == "login-code":
+        print(library.login_code())
+        return
+    library.owner_key()
     server = ThreadingHTTPServer((HOST, PORT), partial(Handler, directory=ROOT))
     print(f"公众号排版工作台：http://{HOST}:{PORT}/")
     if args.open_browser:
