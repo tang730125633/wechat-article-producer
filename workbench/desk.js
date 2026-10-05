@@ -10,7 +10,7 @@
   input.addEventListener('input', () => {operation = null; try {localStorage.setItem(cacheKey,input.value);} catch (_) {captureStatus.textContent='设备暂存不可用，请点击“先记下来”保存。';}});
   const node = (tag, text, className) => {const el=document.createElement(tag);if(text!==undefined) el.textContent=text;if(className) el.className=className;return el;};
   const date = t => new Date(t*1000).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
-  const duration = value => {if(value==null) return '—';const m=Math.floor(value*60+1e-6);return `${Math.floor(m/60)}小时${m%60}分`;};
+  const duration = value => {if(value==null) return '—';const m=Math.floor(value*60+1e-6);return m<60?`${m}分钟`:`${Math.floor(m/60)}小时${m%60}分`;};
   function feedback(text,error=false){captureStatus.textContent=text;captureStatus.dataset.error=String(error);}
   function button(text,callback,style='quiet-button'){const b=node('button',text,style);b.type='button';b.addEventListener('click',callback);return b;}
   function dialog(title){const root=$('#dialogContent');root.replaceChildren(node('h2',title));$('#deskDialog').showModal();return root;}
@@ -123,7 +123,7 @@
         if(key==='awake'&&values.awake&&record.awake==null){const seconds=parts.reduce((n,r)=>n+r.end-r.start,0);values.awake.textContent=parts.length?duration(seconds/3600):'未记录到清醒片段';}
       }
       const axis=node('div',undefined,'sleep-timeline-axis');for(let i=0;i<4;i++)axis.append(node('span',sleepTime(window.start+span*i/3)));canvas.append(axis);
-      const table=node('table'),body=node('tbody');for(const part of rows){const tr=node('tr');for(const text of [stageNames[part.stage],sleepTime(part.start)+'–'+sleepTime(part.end),duration((part.end-part.start)/3600)])tr.append(node('td',text));body.append(tr);}table.append(body);more.append(table);
+      const table=node('table'),body=node('tbody');for(const part of rows){const tr=node('tr');for(const text of [stageNames[part.stage],sleepTime(part.start)+'–'+sleepTime(part.end),part.end-part.start<60?Math.round(part.end-part.start)+'秒':duration((part.end-part.start)/3600)])tr.append(node('td',text));body.append(tr);}table.append(body);more.append(table);
     }
     draw();root.append(node('p','时间轴来自实际分期片段；留白表示该时间段未收到对应记录。明细更新于 '+date(detail.received)+'。','sleep-detail-note'));
   }
