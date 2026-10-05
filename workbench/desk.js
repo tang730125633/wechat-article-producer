@@ -31,7 +31,7 @@
     const words=node('div',undefined,'recall-words');words.setAttribute('aria-label','今天的联想关键词');
     for(const word of recall.words){const b=button(word,()=>window.focusMemoryKeyword(word,true),'recall-word');b.setAttribute('aria-pressed',String(recall.selected===word));b.disabled=busy||!!operation;words.append(b);}root.append(words);
     const word=recall.selected,quote=word&&ideas.filter(i=>i.keywords.includes(word)).at(-1);
-    root.append(node('h2',word?'「'+word+'」让你想起了什么？':'此刻，脑海里冒出了什么？'));
+    root.append(node('h2',word?'这个词，让你想起了什么？':'此刻，脑海里冒出了什么？'));
     root.append(node('p','一个人、一个画面、一件小事。几个字也可以。','recall-prompt'));
     if(quote){const detail=node('details',undefined,'recall-original');detail.append(node('summary','你曾说：'+quote.text.slice(0,52)+(quote.text.length>52?'…':'')),node('blockquote',quote.text),node('small',date(quote.created)+' · 原话'));root.append(detail);}
     else root.append(node('p',!recallLoaded?'原话还在路上，你可以先写。':word?'这个词还没有原话，你想到的可以成为第一句。':'也可以直接写，不用先选词。','subtle'));
