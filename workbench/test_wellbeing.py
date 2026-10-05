@@ -77,6 +77,14 @@ class WellbeingChecks(unittest.TestCase):
                 self.assertEqual(request('/api/wellbeing',upload)[0],401)
                 self.assertEqual(request('/api/articles',upload)[0],401)
                 self.assertEqual(request('/api/health/setup',upload)[0],401)
+                self.assertEqual(request('/api/health/sleep?day=2026-10-03',upload)[0],401)
+                self.assertEqual(request('/api/health/sleep?day=bad',owner)[0],400)
+                self.assertEqual(request('/api/health/sleep?day=2026-10-03',owner)[1]['sleep']['totalSleep'],6.4)
+                sleep_setup=request('/api/health/setup?kind=sleep',owner)[1]
+                sleep_params=urllib.parse.parse_qs(urllib.parse.urlsplit(sleep_setup['setup_url']).query)
+                self.assertEqual(sleep_params['aggregatesleep'],['false'])
+                self.assertEqual(sleep_params['metrics'],['Sleep Analysis'])
+                self.assertEqual(sleep_params['batchrequests'],['false'])
                 for kind in ('metrics','workouts'):
                     status, setup=request('/api/health/setup?kind='+kind,owner)
                     self.assertEqual(status,200)

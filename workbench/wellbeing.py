@@ -10,6 +10,7 @@ import uuid
 import unicodedata
 import urllib.parse
 import library
+import sleep_detail
 from health_metrics import METRICS, metric_record, workout_record
 
 
@@ -30,6 +31,7 @@ def connect():
       CREATE TABLE IF NOT EXISTS health_sync(source TEXT PRIMARY KEY, state TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS health_metrics(day TEXT, name TEXT, summary TEXT NOT NULL, received REAL NOT NULL, PRIMARY KEY(day,name));
       CREATE TABLE IF NOT EXISTS workouts(id TEXT PRIMARY KEY, day TEXT NOT NULL, summary TEXT NOT NULL, received REAL NOT NULL);
+      CREATE TABLE IF NOT EXISTS sleep_segments(source TEXT, start REAL, end REAL, stage TEXT, received REAL NOT NULL, PRIMARY KEY(source,start,end,stage));
     """)
     return db
 
@@ -53,7 +55,7 @@ def upload_authorized(header):
 def sync_identity(body):
     source = body.get("sync_source", "manual")
     interval = body.get("sync_interval", 900 if source != "manual" else 7200)
-    if source not in ("manual", "mac-bridge", "iphone", "iphone-workouts") or isinstance(interval, bool) or not isinstance(interval, int) or not 60 <= interval <= 86400:
+    if source not in ("manual", "mac-bridge", "iphone", "iphone-workouts", "iphone-sleep") or isinstance(interval, bool) or not isinstance(interval, int) or not 60 <= interval <= 86400:
         raise ValueError("同步来源或周期格式错误")
     return source, interval
 
@@ -87,7 +89,7 @@ def import_sleep(body):
     metrics = body.get("data", {}).get("metrics", [])
     if not isinstance(metrics, list):
         raise ValueError("睡眠数据格式错误")
-    rows, quantity_rows, workout_rows = [], {}, {}
+    rows, quantity_rows, workout_rows, segments = [], {}, {}, []
     recognized = False
     for metric in metrics:
         if not isinstance(metric, dict):
@@ -111,13 +113,16 @@ def import_sleep(body):
         recognized = True
         if metric.get("units") != "hr" or not isinstance(metric.get("data"), list):
             raise ValueError("请选择按天汇总的睡眠数据，单位为小时")
+        if any(isinstance(raw, dict) and 'value' in raw for raw in metric['data']):
+            segments.extend(sleep_detail.parse_segments(metric['data']))
+            continue
         for raw in metric["data"]:
             if not isinstance(raw, dict):
                 raise ValueError("睡眠记录格式错误")
             day = str(raw.get("date") or raw.get("end") or raw.get("start") or "")[:10]
             dt.date.fromisoformat(day)
             record = {"day": day}
-            for key in ("totalSleep", "core", "deep", "rem"):
+            for key in ("totalSleep", "core", "deep", "rem", "awake", "asleep", "inBed"):
                 value = raw.get(key)
                 if value is None and key != "totalSleep":
                     continue
@@ -125,7 +130,7 @@ def import_sleep(body):
                     raise ValueError("睡眠时长需要是 0 到 24 小时的有限数值")
                 record[key] = value
             # Daily aggregation boundaries are not actual bedtime/wake time.
-            for key in ("sleepStart", "sleepEnd", "sources"):
+            for key in ("sleepStart", "sleepEnd", "inBedStart", "inBedEnd", "sources"):
                 if isinstance(raw.get(key), str):
                     record[key] = raw[key][:300]
             rows.append((day, json.dumps(record, ensure_ascii=False), time.time()))
@@ -142,6 +147,7 @@ def import_sleep(body):
             workout_rows[record["id"]] = record
     if not recognized or len(rows) > 370 or len(quantity_rows) > 6000:
         raise ValueError("需要支持的按天健康指标或训练记录")
+    segments = sorted(set(segments))
     changed = 0
     with connect() as db:
         db.execute("BEGIN IMMEDIATE")
@@ -165,9 +171,19 @@ def import_sleep(body):
                 continue
             db.execute("INSERT INTO workouts VALUES (?,?,?,?) ON CONFLICT(id) DO UPDATE SET day=excluded.day,summary=excluded.summary,received=excluded.received", (identity,record['day'],encoded,time.time()))
             changed += 1
+        changed += sleep_detail.store_segments(db, segments, time.time())
         days = [r[0] for r in rows] + [d for d, _ in quantity_rows] + [r['day'] for r in workout_rows.values()]
+        if segments:
+            days.append(sleep_detail.latest_day(segments))
         record_sync(db, source, interval, "ok", changed, max(days) if days else None)
-    return {"imported": len({r[0] for r in rows}) + len(quantity_rows) + len(workout_rows), "changed": changed}
+    return {"imported": len({r[0] for r in rows}) + len(quantity_rows) + len(workout_rows) + len(segments), "changed": changed}
+
+
+def sleep_day_detail(day):
+    dt.date.fromisoformat(day)
+    with connect() as db:
+        row = db.execute('SELECT summary,received FROM sleep_days WHERE day=?', (day,)).fetchone()
+        return sleep_detail.detail(db, {**json.loads(row['summary']), 'received': row['received']}) if row else None
 
 
 def health_snapshot():

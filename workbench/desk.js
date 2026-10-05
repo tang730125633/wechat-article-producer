@@ -48,6 +48,86 @@
     const title={ok:'自动同步运行中',error:'同步需要留意',delayed:'同步已超过预期时间',unconfigured:'还没有自动同步通路'}[status];
     return {source,status,title};
   }
+
+  let sleepOpener = '';
+  $('#deskDialog').addEventListener('close',()=>{
+    const modal=$('#deskDialog');if(!modal.classList.contains('sleep-dialog'))return;
+    modal.classList.remove('sleep-dialog');modal.removeAttribute('aria-label');delete $('#dialogContent').dataset.sleepDay;
+    if(sleepOpener)document.getElementById(sleepOpener)?.focus();
+  });
+  function sleepTime(value, day){
+    if(!value)return '—';
+    const normalized=typeof value==='number'?value*1000:value.replace(/^(\d{4}-\d{2}-\d{2}) /,'$1T').replace(/ ([+-]\d{2})(\d{2})$/,'$1:$2');
+    const d=new Date(normalized);if(!Number.isFinite(d.getTime()))return '—';
+    const dayKey=d.toLocaleDateString('en-CA',{timeZone:'Asia/Shanghai'});
+    const time=d.toLocaleTimeString('zh-CN',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit',hour12:false});
+    return (day&&dayKey!==day?dayKey.slice(5).replace('-','/')+' ':'')+time;
+  }
+  const stageNames={awake:'清醒',rem:'快速动眼（REM）',core:'核心睡眠',deep:'深度睡眠',asleep:'未分期睡眠',inBed:'卧床'};
+  function openSleepDay(day){
+    sleepOpener=document.activeElement?.id||'';
+    dialog('睡眠详情');$('#deskDialog').classList.add('sleep-dialog');$('#deskDialog').setAttribute('aria-label','睡眠详情');
+    renderSleepDay(day);
+  }
+  function renderSleepDay(day){
+    const root=$('#dialogContent'),record=data.sleep.find(r=>r.day===day);root.replaceChildren(node('h2','睡眠详情'));root.dataset.sleepDay=day;
+    if(!record){root.append(node('p','这一天还没有收到睡眠记录。'));return;}
+    const records=[...data.sleep].sort((a,b)=>b.day.localeCompare(a.day)),idx=records.findIndex(r=>r.day===day);
+    const nav=node('div',undefined,'sleep-detail-nav'),choose=node('select');choose.id='sleep-detail-date';choose.setAttribute('aria-label','选择睡眠日期');
+    for(const item of records){const option=node('option',item.day);option.value=item.day;choose.append(option);}choose.value=day;
+    const move=target=>{renderSleepDay(target);$('#sleep-detail-date').focus();};choose.onchange=()=>move(choose.value);
+    const prev=button('‹',()=>move(records[idx+1].day),'sleep-date-arrow');prev.disabled=idx===records.length-1;prev.setAttribute('aria-label','上一条睡眠记录');
+    const next=button('›',()=>move(records[idx-1].day),'sleep-date-arrow');next.disabled=idx===0;next.setAttribute('aria-label','下一条睡眠记录');nav.append(prev,choose,next);root.append(nav);
+    const total=node('section',undefined,'sleep-detail-total');total.append(node('small','睡眠时间'),node('strong',duration(record.totalSleep)));
+    const previous=records[idx+1];if(previous){const minutes=Math.round((record.totalSleep-previous.totalSleep)*60);total.append(node('span',`比 ${previous.day.slice(5).replace('-','/')} ${minutes<0?'少':'多'} ${Math.abs(minutes)} 分钟`));}root.append(total);
+    const times=node('div',undefined,'sleep-detail-times');for(const [label,key] of [['入睡','sleepStart'],['起床','sleepEnd']]){const card=node('div');card.append(node('span',label),node('strong',sleepTime(record[key],day)));times.append(card);}root.append(times);
+    const chart=node('section',undefined,'sleep-timeline');chart.append(node('h3','这一晚的睡眠阶段'),node('p','正在读取分期明细…','sleep-detail-note'));root.append(chart);
+    const stageList=node('div',undefined,'sleep-detail-stages'),values={};
+    for(const key of ['awake','rem','core','deep']){const row=node('div',undefined,'sleep-detail-stage');row.dataset.stage=key;const label=node('span',stageNames[key]);const value=node('strong',record[key]==null?'尚未同步':duration(record[key]));values[key]=value;row.append(label,value);stageList.append(row);}root.append(stageList);
+    if(record.inBed>0){const bed=node('p','已记录卧床时间 '+duration(record.inBed),'sleep-detail-note');root.append(bed);}
+    const signals=node('section',undefined,'sleep-detail-signals');signals.append(node('h3','当天的身体记录'));
+    const grid=node('div',undefined,'sleep-signal-grid');
+    for(const [key,label,unit,digits] of [['heart_rate','日均心率','次/分',0],['respiratory_rate','日均呼吸频率','次/分',1],['heart_rate_variability','日均 HRV','毫秒',1],['apple_sleeping_wrist_temperature','睡眠腕温','°C',1]]){
+      const metric=(data.metrics||[]).find(m=>m.day===day&&m.name===key),card=node('div');card.append(node('span',label),node('strong',metric?Number(metric.value).toLocaleString('zh-CN',{maximumFractionDigits:digits}):'—'),node('small',metric?unit:'尚未收到'));
+      if(metric&&key==='heart_rate')card.append(node('small',`当天范围 ${Math.round(metric.min)}–${Math.round(metric.max)}`));grid.append(card);
+    }
+    signals.append(grid,node('p','心率、呼吸和 HRV 是当天汇总，不是整晚专属测量。','sleep-detail-note'));root.append(signals);
+    root.append(node('p','睡眠汇总更新于 '+date(record.received)+'。分期来自设备记录，用于了解自己的变化。','sleep-detail-note'));
+    wb.request('/api/health/sleep?day='+encodeURIComponent(day)).then(detail=>{
+      if(!$('#deskDialog').open||root.dataset.sleepDay!==day)return;
+      renderSleepTimeline(chart,detail,record,values);
+    }).catch(()=>{
+      if(root.dataset.sleepDay!==day)return;
+      chart.replaceChildren(node('h3','这一晚的睡眠阶段'),node('p','分期明细暂时没有取到，汇总记录仍然保留。','sleep-detail-note'),button('重新读取',()=>renderSleepDay(day),'quiet-button'));
+    });
+  }
+  function renderSleepTimeline(root,detail,record,values){
+    root.replaceChildren(node('h3','这一晚的睡眠阶段'));
+    const segments=detail.segments||[],window=detail.window;
+    if(!segments.length||!window){
+      root.append(node('p','这晚目前只有每日汇总，尚未收到逐段时间轴。下面仍可查看已同步的分期时长。','sleep-detail-note'));
+      const composition=node('div',undefined,'sleep-composition'),sum=['rem','core','deep'].reduce((n,k)=>n+(record[k]||0),0);
+      for(const key of ['rem','core','deep'])if(record[key]>0&&sum){const piece=node('span');piece.dataset.stage=key;piece.style.flexGrow=String(record[key]);piece.title=stageNames[key]+' '+duration(record[key]);composition.append(piece);}root.append(composition);
+      const setup=button('连接睡眠分期明细',()=>{$('#deskDialog').close();$('#connectSleep').click();},'text-button');root.append(setup);return;
+    }
+    const sources=[...new Set(segments.map(s=>s.source))].sort((a,b)=>segments.filter(s=>s.source===b&&['rem','core','deep'].includes(s.stage)).length-segments.filter(s=>s.source===a&&['rem','core','deep'].includes(s.stage)).length);
+    const sourceLabel=node('p',sources[0]||'手机同步的睡眠分期','sleep-detail-note'),canvas=node('div'),more=node('details',undefined,'sleep-segment-list');
+    let selected=sources[0];root.append(sourceLabel);
+    if(sources.length>1){const select=node('select');select.setAttribute('aria-label','选择睡眠分期来源');for(const source of sources){const option=node('option',source||'未提供来源');option.value=source;select.append(option);}select.onchange=()=>{selected=select.value;sourceLabel.textContent=selected||'未提供来源';draw();};root.append(select);}root.append(canvas,more);
+    function merged(rows){const out=[];for(const r of [...rows].sort((a,b)=>a.start-b.start)){const last=out.at(-1);if(last&&r.start<=last.end)last.end=Math.max(last.end,r.end);else out.push({...r});}return out;}
+    function draw(){
+      const rows=segments.filter(s=>s.source===selected),span=window.end-window.start;canvas.replaceChildren();more.replaceChildren(node('summary','查看 '+rows.length+' 段原始明细'));
+      const keys=['awake','rem','core','deep'];if(rows.some(s=>s.stage==='asleep'))keys.push('asleep');
+      for(const key of keys){const lane=node('div',undefined,'sleep-timeline-lane'),track=node('div',undefined,'sleep-lane-track');lane.dataset.stage=key;lane.append(node('span',key==='rem'?'REM':stageNames[key]));const parts=merged(rows.filter(s=>s.stage===key));
+        for(const part of parts){const bar=node('span',undefined,'sleep-piece');bar.style.left=((part.start-window.start)/span*100)+'%';bar.style.width=((part.end-part.start)/span*100)+'%';bar.title=stageNames[key]+' '+sleepTime(part.start)+'–'+sleepTime(part.end);track.append(bar);}lane.append(track);canvas.append(lane);
+        if(key==='awake'&&values.awake&&record.awake==null){const seconds=parts.reduce((n,r)=>n+r.end-r.start,0);values.awake.textContent=parts.length?duration(seconds/3600):'未记录到清醒片段';}
+      }
+      const axis=node('div',undefined,'sleep-timeline-axis');for(let i=0;i<4;i++)axis.append(node('span',sleepTime(window.start+span*i/3)));canvas.append(axis);
+      const table=node('table'),body=node('tbody');for(const part of rows){const tr=node('tr');for(const text of [stageNames[part.stage],sleepTime(part.start)+'–'+sleepTime(part.end),duration((part.end-part.start)/3600)])tr.append(node('td',text));body.append(tr);}table.append(body);more.append(table);
+    }
+    draw();root.append(node('p','时间轴来自实际分期片段；留白表示该时间段未收到对应记录。明细更新于 '+date(detail.received)+'。','sleep-detail-note'));
+  }
+
   function renderHealthDetail(root){
     const latest=data.sleep[0],sync=syncInfo(),source=sync.source;
     const control=node('div',undefined,'health-live-heading');const badge=node('span',sync.title,'health-live-badge');badge.dataset.state=sync.status;
@@ -62,13 +142,14 @@
     const changed=Math.max(0,...[...data.sleep,...(data.metrics||[]),...(data.workouts||[])].map(s=>s.received||0));add('内容实际变化',changed?date(changed):'还没有新内容');add(source?.source.startsWith('iphone')?'期望同步间隔':'检查周期',source?`每 ${Math.round(source.interval/60)} 分钟`:'等待配置');
     connection.append(times,node('p','页面打开时每分钟自动刷新；切回来也会立即检查。','subtle'));
     if(source?.source.startsWith('iphone'))connection.append(node('p','数据由 iPhone 直接上传；Mac 只负责看网页。手机锁屏及 iOS 后台调度会影响上传时机。','health-dependency'));
-    for(const [channel,label] of [['iphone','手机健康指标'],['iphone-workouts','手机训练记录']]){const receipt=(data.sync?.sources||[]).find(s=>s.source===channel);connection.append(node('p',label+'：'+(receipt?.success?'收到于 '+date(receipt.success):'尚未收到直传'),'health-channel-receipt'));}
+    for(const [channel,label] of [['iphone','手机健康指标'],['iphone-workouts','手机训练记录'],['iphone-sleep','手机睡眠明细']]){const receipt=(data.sync?.sources||[]).find(s=>s.source===channel);connection.append(node('p',label+'：'+(receipt?.success?'收到于 '+date(receipt.success):'尚未收到直传'),'health-channel-receipt'));}
     if(source?.source==='mac-bridge')connection.append(node('p','Mac 休眠或关机时暂停，恢复后继续。手机直传接通后可不依赖 Mac。','health-dependency'));
     if(sync.status==='error'||sync.status==='delayed'){const errors={source_unavailable:'Mac 上的健康服务暂时无法读取。',source_rejected:'健康服务拒绝了读取，请检查应用授权。',invalid_source_data:'健康服务返回的数据暂时无法解析。',no_records:'上游尚未返回新的睡眠记录。'};connection.append(node('p',healthReadFailed?'网页暂时联系不上服务器；这里保留的是上次状态。':sync.status==='delayed'?(data.sync?.primary==='iphone'?'较久没有收到手机上传。请解锁 iPhone，检查健康导出应用的运行记录。':'很久没有收到自动检查了，请确认 Mac 在线、健康服务仍在运行。'):errors[source?.error]||'这轮同步没有成功，历史记录已保留。','health-pending'));}
+    if(latest)night.append(button('查看这晚详情 →',()=>openSleepDay(latest.day),'text-button'));
     connection.append(button('手机直传设置',()=>$('#connectSleep').click(),'text-button'));top.append(night,connection);root.append(top);renderMovement(root);
     const week=node('section',undefined,'health-week-card');const heading=node('div',undefined,'section-heading');heading.append(node('h2','最近七天，身体的节奏'));
     const bars=node('div',undefined,'health-week-bars'),records=[];
-    for(let i=6;i>=0;i--){const d=new Date(data.today+'T12:00:00+08:00');d.setUTCDate(d.getUTCDate()-i);const day=d.toLocaleDateString('en-CA',{timeZone:'Asia/Shanghai'}),record=data.sleep.find(s=>s.day===day);if(record)records.push(record);const col=node('div',undefined,'health-day-column');col.dataset.missing=String(!record);const area=node('div',undefined,'health-bar-area'),bar=node('i');bar.style.height=record?Math.max(3,Math.min(100,record.totalSleep/12*100))+'%':'2px';area.append(bar);col.append(node('strong',record?duration(record.totalSleep):'未收到'),area,node('span',day.slice(5).replace('-','/')));bars.append(col);}
+    for(let i=6;i>=0;i--){const d=new Date(data.today+'T12:00:00+08:00');d.setUTCDate(d.getUTCDate()-i);const day=d.toLocaleDateString('en-CA',{timeZone:'Asia/Shanghai'}),record=data.sleep.find(s=>s.day===day);if(record)records.push(record);const col=button('',()=>openSleepDay(day),'health-day-column');col.id='sleep-week-'+day;col.disabled=!record;col.setAttribute('aria-label',day+' · '+(record?duration(record.totalSleep)+'，查看睡眠详情':'未收到睡眠记录'));col.dataset.missing=String(!record);const area=node('span',undefined,'health-bar-area'),bar=node('i');bar.style.height=record?Math.max(3,Math.min(100,record.totalSleep/12*100))+'%':'2px';area.append(bar);col.append(node('strong',record?duration(record.totalSleep):'未收到'),area,node('span',day.slice(5).replace('-','/')));bars.append(col);}
     heading.append(node('span',`已收到 ${records.length} / 7 天`,'subtle'));week.append(heading,bars);
     let insight='先积累真实记录。缺失日期留空，不记成零，也不凭一晚给你打分。';
     if(records.length>=3){const recent=records[records.length-1],previous=records.slice(0,-1),avg=previous.reduce((sum,r)=>sum+r.totalSleep,0)/previous.length,diff=Math.round((recent.totalSleep-avg)*60);insight=`最近这晚比前 ${previous.length} 晚的平均时长${diff<0?'少':'多'} ${Math.abs(diff)} 分钟。今天的感受，也值得一起记下来。`;}
@@ -114,7 +195,7 @@
     if(latest){const m=Math.floor(latest.totalSleep*60+1e-6);$('#sleepTotal').append(node('span',String(Math.floor(m/60))),node('small','小时'),node('span',String(m%60)),node('small','分'));$('#sleepLabel').textContent=latest.day===today?'最近一晚睡眠':latest.day+' 的睡眠';$('#sleepSync').textContent=`收到于 ${date(latest.received)}${latest.day!==today?' · 待新记录':''}`;}
     else {$('#sleepTotal').append(node('span','—'),node('small',' 等待同步'));$('#sleepSync').textContent='还没有收到睡眠记录';}
     $('#sleepChart').replaceChildren();
-    for(let offset=6;offset>=0;offset--){const d=new Date(today+'T12:00:00+08:00');d.setUTCDate(d.getUTCDate()-offset);const day=d.toLocaleDateString('en-CA',{timeZone:'Asia/Shanghai'});const record=data.sleep.find(s=>s.day===day);const bar=node('div',undefined,'sleep-bar');bar.dataset.current=String(offset===0);bar.dataset.missing=String(!record);bar.title=day+' · '+(record?duration(record.totalSleep):'暂无记录');const line=node('i');line.style.height=(record?Math.max(3,Math.min(55,record.totalSleep/10*55)):2)+'px';bar.append(line,node('span',offset===0?'今天':d.toLocaleDateString('zh-CN',{timeZone:'Asia/Shanghai',weekday:'short'})));$('#sleepChart').append(bar);}
+    for(let offset=6;offset>=0;offset--){const d=new Date(today+'T12:00:00+08:00');d.setUTCDate(d.getUTCDate()-offset);const day=d.toLocaleDateString('en-CA',{timeZone:'Asia/Shanghai'});const record=data.sleep.find(s=>s.day===day);const bar=button('',()=>openSleepDay(day),'sleep-bar');bar.id='sleep-mini-'+day;bar.disabled=!record;bar.setAttribute('aria-label',day+' · '+(record?duration(record.totalSleep)+'，查看睡眠详情':'未收到睡眠记录'));bar.dataset.current=String(offset===0);bar.dataset.missing=String(!record);bar.title=day+' · '+(record?duration(record.totalSleep):'暂无记录');const line=node('i');line.style.height=(record?Math.max(3,Math.min(55,record.totalSleep/10*55)):2)+'px';bar.append(line,node('span',offset===0?'今天':d.toLocaleDateString('zh-CN',{timeZone:'Asia/Shanghai',weekday:'short'})));$('#sleepChart').append(bar);}
     const sync=syncInfo();const recordText=latest?'记录 '+latest.day:'暂无睡眠记录';$('#sleepSync').textContent=sync.source?`${recordText} · ${sync.status==='ok'?'自动同步':sync.title} · 检查于 ${date(sync.source.checked)}`:`${recordText} · 尚未接通自动同步`;$('#sleepSync').dataset.state=sync.status;
     const checkin=data.checkins.find(c=>c.day===today);
     document.querySelectorAll('[data-mood]').forEach(b=>b.setAttribute('aria-pressed',String(checkin?.mood===b.dataset.mood)));
@@ -165,16 +246,16 @@
     if(kind==='reflection'&&data.checkins.length){const title=node('h2','你记录过的身体感受');title.style.marginTop='32px';root.append(title);for(const c of data.checkins)root.append(node('p',c.day+' · '+({good:'有精神',okay:'一般',tired:'有点累'}[c.mood]),'subtle'));}
   }
   $('#connectSleep').onclick=async()=>{
-    const root=dialog('让 iPhone 直接上传');root.append(node('p','请在 iPhone Safari 中打开本页。首次配置按顺序添加健康指标、训练记录两项自动化；配置后上传不经过 Mac。'));
+    const root=dialog('让 iPhone 直接上传');root.append(node('p','请在 iPhone Safari 中打开本页。健康指标、训练记录和睡眠分期分别同步；只添加尚未接通的项目，上传不经过 Mac。'));
     const status=node('p','正在准备手机配置…','dialog-status');root.append(status);
     try{
-      for(const [kind,channel,label] of [['metrics','iphone','① 设置健康指标直传'],['workouts','iphone-workouts','② 设置训练记录直传']]){
+      for(const [kind,channel,label] of [['metrics','iphone','① 设置健康指标直传'],['workouts','iphone-workouts','② 设置训练记录直传'],['sleep','iphone-sleep','③ 设置睡眠分期明细']]){
         const receipt=(data.sync?.sources||[]).find(s=>s.source===channel);
         if(receipt?.success){root.insertBefore(node('p',label+'：已收到手机上传。以后请在 Health Auto Export 中管理现有自动化。'),status);continue;}
         const setup=await wb.request('/api/health/setup?kind='+kind);const link=node('a',label,'desk-primary');link.href=setup.setup_url;link.style.margin='8px 0';root.insertBefore(link,status);
       }
       status.textContent='在 Health Auto Export 中确认配置并分别执行一次“手动导出”。不要重复创建同名自动化。手机锁屏时健康读取受限；配置完成不等于上传已成功。';
-      root.append(button('已执行上传，核对接收结果',async()=>{try{await refresh();const got=(data.sync?.sources||[]).filter(s=>s.source.startsWith('iphone')&&s.success);status.textContent=got.length===2?'健康指标和训练通路均已收到手机上传。':'已收到 '+got.length+' / 2 项手机直传，请核对未完成项目。';}catch(error){status.textContent=error.message;}}));
+      root.append(button('已执行上传，核对接收结果',async()=>{try{await refresh();const got=(data.sync?.sources||[]).filter(s=>s.source.startsWith('iphone')&&s.success);status.textContent=got.length===3?'三项手机直传均有成功回执。':'已收到 '+got.length+' / 3 项手机直传，请核对未完成项目。';}catch(error){status.textContent=error.message;}}));
     }catch(error){status.textContent=error.message;}
   };
   const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;let recognition=null;

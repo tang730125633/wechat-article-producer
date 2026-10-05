@@ -326,6 +326,12 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json(200, wellbeing.snapshot())
             if parsed.path == "/api/health":
                 return self.send_json(200, wellbeing.health_snapshot())
+            if parsed.path == '/api/health/sleep':
+                try:
+                    result = wellbeing.sleep_day_detail(query.get('day', [''])[0])
+                except ValueError:
+                    return self.send_json(400, {'error': '请选择有效日期'})
+                return self.send_json(200 if result else 404, result or {'error': '这天还没有睡眠记录'})
             if parsed.path == "/api/ideas":
                 return self.send_json(200, {"ideas": wellbeing.ideas(), "keywords": wellbeing.keywords()})
             if parsed.path == "/api/health/setup":
@@ -333,17 +339,19 @@ class Handler(SimpleHTTPRequestHandler):
                     return self.send_json(400, {"error": "请从线上工作台配置手机同步"})
                 endpoint = PUBLIC_ORIGIN + "/wechat/api/health/import"
                 kind = query.get('kind', ['metrics'])[0]
-                if kind not in ('metrics', 'workouts'):
+                if kind not in ('metrics', 'workouts', 'sleep'):
                     return self.send_json(400, {'error': '同步类型不支持'})
-                source = 'iphone' if kind == 'metrics' else 'iphone-workouts'
-                params = {"name": "泽龙健康指标直传" if kind == 'metrics' else '泽龙训练记录直传', "url": endpoint, "format": "json",
-                    "datatype": "healthMetrics" if kind == 'metrics' else 'workouts', "period": "none",
+                source = {'metrics':'iphone', 'workouts':'iphone-workouts', 'sleep':'iphone-sleep'}[kind]
+                params = {"name": {'metrics':'泽龙健康指标直传','workouts':'泽龙训练记录直传','sleep':'泽龙睡眠分期直传'}[kind], "url": endpoint, "format": "json",
+                    "datatype": "workouts" if kind == 'workouts' else 'healthMetrics', "period": "none",
                     "exportversion": "v2", "syncinterval": "minutes", "syncquantity": "15",
                     "headers": "Authorization,Bearer " + wellbeing.upload_key() + ",X-Health-Source," + source, "enabled": "true",
                     "notifywhenrun": "false"}
                 if kind == 'metrics':
                     params.update(aggregatedata="true", aggregatesleep="true", interval="days")
                     params['metrics'] = ','.join(['Sleep Analysis'] + [spec[0] for spec in wellbeing.METRICS.values()])
+                elif kind == 'sleep':
+                    params.update(aggregatedata="false", aggregatesleep="false", metrics="Sleep Analysis", batchrequests="false")
                 else:
                     params.update(includeroutes="false", includeworkoutmetadata="false")
                 return self.send_json(200, {"setup_url": "com.HealthExport://automation?" + urllib.parse.urlencode(params, quote_via=urllib.parse.quote), "endpoint": endpoint})
