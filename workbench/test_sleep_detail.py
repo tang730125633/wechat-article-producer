@@ -15,9 +15,9 @@ class SleepDetailChecks(unittest.TestCase):
             wellbeing.import_sleep({'sync_source':'iphone','data':{'metrics':[{'name':'sleep_analysis','units':'hr','data':[summary]}]}})
             def part(start,end,value):
                 return {'startDate':start,'endDate':end,'value':value,'source':'Test Watch'}
-            rows=[part('2026-10-04 23:30:00 +0800','2026-10-05 00:30:00 +0800','Core'),
-                  part('2026-10-05 00:30:00 +0800','2026-10-05 00:45:00 +0800','Awake'),
-                  part('2026-10-05 00:45:00 +0800','2026-10-05 01:30:00 +0800','Deep')]
+            rows=[part('2026-10-04 23:30:00 +0800','2026-10-05 00:30:00 +0800','核心'),
+                  part('2026-10-05 00:30:00 +0800','2026-10-05 00:45:00 +0800','清醒'),
+                  part('2026-10-05 00:45:00 +0800','2026-10-05 01:30:00 +0800','深度')]
             payload={'sync_source':'iphone-sleep','data':{'metrics':[{'name':'sleep_analysis','units':'hr','data':rows+[rows[0]]}]}}
             with patch('wellbeing.time.time',return_value=1000):
                 self.assertEqual(wellbeing.import_sleep(payload)['imported'],3)
@@ -33,7 +33,7 @@ class SleepDetailChecks(unittest.TestCase):
                 detail=wellbeing.sleep_day_detail('2026-10-05')
                 self.assertEqual(len(detail['segments']),3)
                 self.assertEqual(next(r for r in detail['segments'] if r['stage']=='deep')['start'],timestamp(rows[2]['startDate']))
-            rows.append(part('2026-10-05 01:00:00 +0800','2026-10-05 00:30:00 +0800','Core'))
+            rows.append(part('2026-10-05 01:00:00 +0800','2026-10-05 00:30:00 +0800','核心'))
             payload['data']['metrics'][0]['data']=rows
             with self.assertRaises(ValueError):wellbeing.import_sleep(payload)
             self.assertEqual(len(wellbeing.sleep_day_detail('2026-10-05')['segments']),3)

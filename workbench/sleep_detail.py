@@ -5,7 +5,8 @@ from collections import defaultdict
 from health_metrics import LOCAL_TZ, timestamp, text
 
 STAGES = {'Awake': 'awake', 'REM': 'rem', 'Core': 'core', 'Deep': 'deep',
-          'Asleep': 'asleep', 'Unspecified': 'asleep', 'In Bed': 'inBed'}
+          'Asleep': 'asleep', 'Unspecified': 'asleep', 'In Bed': 'inBed',
+          '清醒': 'awake', '快速动眼期': 'rem', '核心': 'core', '深度': 'deep'}
 
 
 def parse_segments(rows):

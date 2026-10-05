@@ -412,7 +412,14 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ValueError("睡眠数据格式错误")
                 if self.headers.get("X-Health-Source"):
                     body["sync_source"] = self.headers["X-Health-Source"]
-                return self.send_json(200, wellbeing.import_sleep(body))
+                try:
+                    result = wellbeing.import_sleep(body)
+                except ValueError:
+                    source, interval = wellbeing.sync_identity(body)
+                    wellbeing.report_sync({'sync_source': source, 'sync_interval': interval,
+                                           'status': 'error', 'error': 'invalid_source_data'})
+                    raise
+                return self.send_json(200, result)
             if self.path == "/api/health/sync":
                 return self.send_json(200, wellbeing.report_sync(body))
             if self.path == "/api/checkin":

@@ -80,6 +80,11 @@ class WellbeingChecks(unittest.TestCase):
                 self.assertEqual(request('/api/health/sleep?day=2026-10-03',upload)[0],401)
                 self.assertEqual(request('/api/health/sleep?day=bad',owner)[0],400)
                 self.assertEqual(request('/api/health/sleep?day=2026-10-03',owner)[1]['sleep']['totalSleep'],6.4)
+                invalid={'sync_source':'iphone-sleep','data':{'metrics':[{'name':'sleep_analysis','units':'hr','data':[{'value':'Unknown'}]}]}}
+                self.assertEqual(request('/api/health/import',upload,invalid)[0],400)
+                receipt=next(s for s in request('/api/health',owner)[1]['sync']['sources'] if s['source']=='iphone-sleep')
+                self.assertEqual(receipt['error'],'invalid_source_data')
+                self.assertNotIn('success',receipt)
                 sleep_setup=request('/api/health/setup?kind=sleep',owner)[1]
                 sleep_params=urllib.parse.parse_qs(urllib.parse.urlsplit(sleep_setup['setup_url']).query)
                 self.assertEqual(sleep_params['aggregatesleep'],['false'])
